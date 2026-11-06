@@ -74,6 +74,9 @@
   button:hover, .file-btn:hover { background: var(--hover-bg); }
   button:focus-visible, .file-btn:focus-within { outline: 2px solid var(--line); outline-offset: 2px; }
   #gravity[aria-pressed="false"] { color: var(--muted); border-style: dashed; }
+  .size-ctl { display: flex; align-items: center; gap: .5rem; font: 600 .9rem "Barlow", system-ui, sans-serif; }
+  .size-ctl input { width: 8rem; accent-color: var(--ink); }
+  .size-ctl output { min-width: 3ch; color: var(--muted); font-variant-numeric: tabular-nums; }
   .file-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   #msg { padding: 0 var(--pad); color: var(--muted); font-size: .9rem; min-height: 1.3em; }
   .stages {
@@ -217,6 +220,11 @@
     <div class="controls">
       <label class="file-btn" title="CSV with a County column plus Yes and No columns (e.g. Yes/For, No/Against)">
         Load CSV<input id="file" type="file" accept=".csv,text/csv">
+      </label>
+      <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
+        Size
+        <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
+        <output id="size-out" for="size">100%</output>
       </label>
       <button id="drop" type="button">Drop again</button>
       <button id="shake" type="button">Shake</button>
@@ -1011,11 +1019,14 @@ function readColors() {
   }
 }
 
+let sizeFactor = 1;
+
 function dropBoth() {
   if (!current) return;
   const { totals } = current;
   // One shared scale: the side with more votes fills `fillRatio` of the smaller stage
-  const k = (CONFIG.fillRatio * Math.min(...sims.map(s => s.area()))) / Math.max(totals.yes, totals.no);
+  // The size slider scales linear dimensions, so area scales with its square
+  const k = (sizeFactor ** 2 * CONFIG.fillRatio * Math.min(...sims.map(s => s.area()))) / Math.max(totals.yes, totals.no);
   sims.forEach(s => s.drop(current, k));
 }
 
@@ -1044,6 +1055,15 @@ document.getElementById("file").addEventListener("change", async e => {
     msg(`Couldn’t load ${file.name}. ${err.message}`);
   }
   e.target.value = "";
+});
+const sizeInput = document.getElementById("size");
+const sizeOut = document.getElementById("size-out");
+sizeInput.addEventListener("input", () => {
+  sizeOut.textContent = `${Math.round(sizeInput.value * 100)}%`; // live readout; re-drop on release
+});
+sizeInput.addEventListener("change", () => {
+  sizeFactor = Number(sizeInput.value);
+  dropBoth();
 });
 document.getElementById("drop").addEventListener("click", dropBoth);
 document.getElementById("shake").addEventListener("click", () => sims.forEach(s => s.shake()));
