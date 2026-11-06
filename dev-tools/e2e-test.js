@@ -12,7 +12,23 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const HTML = 'file://' + path.resolve(__dirname, '..', 'colorado-ballot-measure.html');
+const http = require('http');
+
+const ROOT = path.resolve(__dirname, '..');
+const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'ballot-measures.json'), 'utf8'));
+const MEASURE_KEY = '6060'; // Amendment 87, the measure the table/hover checks run against
+const M = DATA.measures.find(m => m.key === MEASURE_KEY);
+const stateYes = Object.values(M.counties).reduce((a, c) => a + c.yes, 0);
+const stateNo = Object.values(M.counties).reduce((a, c) => a + c.no, 0);
+const stateTotal = stateYes + stateNo;
+
+// The page fetches data/ballot-measures.json, which browsers block on file://, so serve the repo
+const TYPES = { '.html': 'text/html', '.json': 'application/json' };
+const server = http.createServer((req, res) => {
+  const f = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/$/, '/colorado-ballot-measure.html'));
+  if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404).end(); return; }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }).end(fs.readFileSync(f));
+});
 
 function findD3() {
   for (const dir of require.resolve.paths('d3') || []) {
@@ -33,6 +49,8 @@ const ok = (name, cond, detail = '') => {
 const nf = n => n.toLocaleString('en-US');
 
 (async () => {
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const HTML = `http://127.0.0.1:${server.address().port}/colorado-ballot-measure.html`;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   const errors = [];
@@ -49,10 +67,11 @@ const nf = n => n.toLocaleString('en-US');
     if (u.includes('d3@')) return route.fulfill({ path: D3, contentType: 'text/javascript' });
     if (u.includes('topojson-client')) return route.fulfill({ path: SHIM, contentType: 'text/javascript' });
     if (u.includes('poly-decomp') || u.includes('matter-js')) return route.fulfill({ path: STUB, contentType: 'text/javascript' });
-    return u.startsWith('file:') ? route.continue() : route.abort();
+    return u.startsWith('http://127.0.0.1') ? route.continue() : route.abort();
   });
 
-  await page.goto(HTML);
+  await page.goto(`${HTML}?measure=${MEASURE_KEY}`);
+  await page.waitForSelector('#measure option', { state: 'attached' });
   await page.waitForTimeout(5500); // let the staggered drop finish (64 counties x 70 ms)
 
   const clearTexts = () => page.evaluate(() => { window.__texts = []; });
@@ -84,6 +103,15 @@ const nf = n => n.toLocaleString('en-US');
   ok('starts as circles', (await page.evaluate(() => shapeMode)) === 'circle');
   ok('shape button offers map shapes', (await page.$eval('#shape', e => e.textContent)) === 'Show map shapes');
 
+  // ---- Measure picker -----------------------------------------------------------------
+  const opts = await page.$$eval('#measure option', t => t.map(o => [o.value, o.textContent]));
+  ok('picker lists all 14 statewide measures', opts.length === 14 && opts.length === DATA.measures.length, `got ${opts.length}`);
+  ok('picker has no judicial or candidate contests', opts.every(([, t]) => /^(Amendment|Proposition) /.test(t)), JSON.stringify(opts));
+  ok('?measure= deep link selects that measure', (await page.$eval('#measure', e => e.value)) === MEASURE_KEY);
+  ok('title shows the measure', (await page.$eval('#title', e => e.textContent)) === M.title);
+  ok('snapshot note shows reporting progress',
+    (await page.$eval('#snapshot-note', e => e.textContent)).includes(`${M.precinctsReportingPercent}% of precincts reporting`));
+
   // ---- Table content --------------------------------------------------------------
   let d = await rows();
   ok('64 county rows', d.length === 64, `got ${d.length}`);
@@ -104,21 +132,24 @@ const nf = n => n.toLocaleString('en-US');
     d.every(r => r.numWeight === '700' && r.wordWeight === '700' && r.subWeight === '400'));
   ok('differential under margin is the bare vote gap', d.every(r => r.marginSub === nf(Math.abs(r.yes - r.no))));
   ok('total shows count and share of state underneath', d.every(r => {
-    const share = r.total / 2431209;
+    const share = r.total / stateTotal;
     return r.totalMain === nf(r.total) && r.totalSub === (share * 100).toFixed(share < 0.01 ? 2 : 1) + '%';
   }));
   const foot = await page.$eval('#results-table tfoot tr', r => [r.children[0].textContent, r.querySelector('.margin-main').textContent, r.querySelector('.margin-sub').textContent, r.querySelector('.total-main').textContent, r.querySelector('.total-sub').textContent]);
-  ok('Statewide footer row', foot.join('|') === 'Statewide|+1.5 Yes|36,495|2,431,209|100.0%', foot.join('|'));
+  const diff = stateYes - stateNo, pts = Math.abs(diff) / stateTotal * 100;
+  const footExpected = [`+${pts.toFixed(1)} ${diff > 0 ? 'Yes' : 'No'}`, nf(Math.abs(diff)), nf(stateTotal), '100.0%'];
+  ok('Statewide footer row', foot.join('|') === ['Statewide', ...footExpected].join('|'), foot.join('|'));
 
   // ---- Hover: table row -> canvases -------------------------------------------------
   await clearTexts();
   const adams = page.locator('#results-table tbody tr', { has: page.locator('td.name', { hasText: /^Adams$/ }) });
+  const A = M.counties.Adams;
   for (const [what, sel] of [['name', 'td.name'], ['bar', 'td.split-cell'], ['margin', 'td.margin-cell'], ['total', 'td.total-cell']]) {
     await adams.locator(sel).hover();
     const id = await page.evaluate(() => tableHoverId);
     const labels = await countyLabels();
     ok(`hovering the ${what} cell highlights the county and labels both containers (with name)`,
-      id === '08001' && labels.includes('Adams County: 91,280 yes votes (51.5% of county)') && labels.includes('Adams County: 85,829 no votes (48.5% of county)'),
+      id === '08001' && labels.includes(`Adams County: ${nf(A.yes)} yes votes (${(A.yes / (A.yes + A.no) * 100).toFixed(1)}% of county)`) && labels.includes(`Adams County: ${nf(A.no)} no votes (${(A.no / (A.yes + A.no) * 100).toFixed(1)}% of county)`),
       `id=${id} labels=${JSON.stringify(labels)}`);
   }
   await page.locator('#results-table tfoot tr td').first().hover();
@@ -133,6 +164,22 @@ const nf = n => n.toLocaleString('en-US');
   const onYes = await countyLabels();
   ok('hovering a shape labels both containers', onYes.length === 2 && onYes.every(t => t.startsWith('Denver County:')), JSON.stringify(onYes));
   await page.mouse.move(600, 5);
+
+  // ---- Switching measures -------------------------------------------------------------
+  const other = DATA.measures.find(m => m.key !== MEASURE_KEY);
+  await page.selectOption('#measure', other.key);
+  await page.waitForTimeout(300);
+  const oy = Object.values(other.counties).reduce((a, c) => a + c.yes, 0);
+  const on = Object.values(other.counties).reduce((a, c) => a + c.no, 0);
+  const ofoot = await page.$eval('#results-table tfoot tr', r => r.querySelector('.total-main').textContent);
+  ok('picking another measure updates title and statewide total',
+    (await page.$eval('#title', e => e.textContent)) === other.title && ofoot === nf(oy + on), `${other.title} ${ofoot}`);
+  ok('picking a measure updates the URL', new URL(page.url()).searchParams.get('measure') === other.key);
+  await page.selectOption('#measure', MEASURE_KEY);
+  await page.waitForTimeout(300);
+  ok('switching back restores the first measure', (await page.$eval('#title', e => e.textContent)) === M.title);
+  await page.waitForTimeout(5500); // let the re-drop finish before canvas checks
+  await page.evaluate(() => window.scrollTo(0, 0));
 
   // ---- Sorting: dropdown + header buttons -------------------------------------------
   const measure = {
@@ -182,6 +229,7 @@ const nf = n => n.toLocaleString('en-US');
   ok('table is centered at 1100-1900px wide', centered);
 
   await browser.close();
+  server.close();
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
 })();

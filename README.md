@@ -19,14 +19,18 @@ The project grew in three steps. **`colorado-ballot-measure.html` is the current
 ```
 colorado-county-viz/
 ├── README.md                              this file
-├── colorado-ballot-measure.html           MAIN PAGE (about 420 KB; data embedded)
+├── colorado-ballot-measure.html           MAIN PAGE (about 420 KB; county shapes embedded)
 ├── colorado-counties-gravity.html         stage 2
 ├── colorado-counties-by-population.html   stage 1
 ├── data/
 │   ├── colorado-counties.json             source TopoJSON of the 64 counties (original, untrimmed)
-│   └── amendment_87_results.csv           sample election results (the page's embedded default)
+│   ├── all_co_results.xml                 Secretary of State results snapshot (all contests)
+│   ├── ballot-measures.json               generated: the 14 statewide ballot measures (what the page loads)
+│   └── amendment_87_results.csv           old sample results (no longer used by the page)
+├── scripts/
+│   └── build-ballot-measures.mjs          XML -> data/ballot-measures.json
 └── dev-tools/                             optional: headless-browser checks that need no network
-    ├── e2e-test.js                        29 pass/fail checks against the main page
+    ├── e2e-test.js                        35 pass/fail checks against the main page
     ├── matter-stub.js                     stand-in for Matter.js + poly-decomp
     ├── topojson-shim.js                   stand-in for topojson-client
     └── package.json                       playwright + d3 dev dependencies
@@ -36,7 +40,7 @@ The HTML pages are **self-contained**: county shapes and data are embedded inlin
 
 ## 3. Running it
 
-No build step, no framework. Open an HTML file in a browser, or serve the folder (`npx serve .`) and visit `/colorado-ballot-measure.html`.
+No build step, no framework. Serve the folder (`npx serve .`) and visit `/colorado-ballot-measure.html`. The main page fetches `data/ballot-measures.json`, which browsers block on `file://`, so double-clicking it shows a message instead of data. (Stages 1 and 2 are fully self-contained and still open directly.)
 
 Network is needed only to load libraries from CDNs (pinned versions) and Google Fonts (falls back to system fonts):
 
@@ -51,7 +55,7 @@ Network is needed only to load libraries from CDNs (pinned versions) and Google 
 - Each county's **area is proportional to its votes on that side**. Both sides share **one scale** (px² per vote), so county areas and each side's total covered area are directly comparable.
 - Shapes **start as equal-area circles**. A header button toggles to the county outlines ("Show map shapes" / "Show as circles") with a **550 ms morph animation** in both directions. Physics bodies swap instantly; only the drawing is tweened.
 - Counties drop in largest first, so big ones land at the bottom. Free rotation is on. Drag or fling with mouse or touch.
-- Header buttons: **Load CSV**, **Drop again**, **Shake**, **Gravity on/off**, shape toggle. The two sides are separate Matter worlds; the buttons act on both.
+- Header buttons: **Measure** picker (top left), **Drop again**, **Shake**, **Gravity on/off**, shape toggle. The two sides are separate Matter worlds; the buttons act on both.
 - Hover or drag a county on either side: it highlights on **both** sides, with a label on each, e.g. `Adams County: 91,280 yes votes (51.5% of county)`. The side under the pointer shows the label by the cursor; the other side pins it above the county.
 
 ### Results table (below the containers)
@@ -70,18 +74,16 @@ The heading, controls and table share one centered column (max width `58rem` plu
 - **Row hover:** hovering **anywhere on a county row** highlights that county in both containers and shows the labelled tooltips. Hover state is cleared when the table is rebuilt (sort, search) or the pointer leaves.
 - Light and dark mode via CSS variables (`prefers-color-scheme`).
 
-### Loading other measures
-**Load CSV** accepts any comma-delimited file with a header row, a county column and yes and no columns. Detection is by header keyword, case-insensitive, **first match wins**:
+### Choosing a measure
+The **Measure** picker in the header lists the statewide ballot measures (currently Amendments 81-87 and Propositions NN, 132-137). Choosing one reloads the containers and table; the choice is kept in the URL (`?measure=6060`) so links are shareable. A line under the title shows the election, the share of precincts reporting and the snapshot time, since results are partial until counting finishes.
 
-| Column | Header regex |
-|---|---|
-| County | `/county\|name/i` |
-| Yes | `/\byes\b\|\bfor\b/i` (e.g. `Yes`, `Yes/For`, `Votes For`) |
-| No | `/\bno\b\|\bagainst\b/i` (e.g. `No`, `No/Against`) |
+**Refreshing the data:** replace `data/all_co_results.xml` with a newer Secretary of State export, then run
 
-Other columns (Registered Voters, Total) are ignored; totals are computed as Yes + No. County names are matched ignoring case, a trailing "County", spaces and punctuation. Rows named Total/Totals/Statewide/All are skipped. Unmatched rows and counties missing from the file are listed under the header. The page title comes from the file name (`amendment_87_results.csv` becomes "Amendment 87").
+```bash
+node scripts/build-ballot-measures.mjs        # optional args: [input.xml] [output.json]
+```
 
-The **embedded default** lives in `<script type="text/csv" id="results-csv" data-title="Amendment 87">…</script>`. To change the default measure, replace that block's contents and `data-title` (the CSV must not contain the text `</script>`).
+The script keeps only contests with Choices `Yes/For` and `No/Against` that cover all 64 counties. Judicial retention (plain `Yes`/`No`), candidate races and partial-county measures are skipped and counted in its summary. It fails loudly if a measure lacks a county or the county votes don't add up to the XML's `totalVotes`. Needs Node 16+, no packages.
 
 ## 5. Data facts
 
@@ -97,7 +99,7 @@ One inline `<script>` (the one with no attributes). Sections, in order:
 1. **`CONFIG`**: `fillRatio` 0.40 (share of a container the larger side fills), `simplifyPx` 0.8, `minLabelPx` 46, `dropIntervalMs` 70, `body` (Matter options: friction 0.6, frictionStatic 1, frictionAir 0.02, restitution 0, slop 0.1), `shakeStrength` 1, `morphMs` 550, `morphPoints` 64.
 2. **Shared helpers:** `fmt`, `pct`, `countyLabel(name, side, votes, share)` (the one wording used for every canvas tooltip), `normName`, `msg`. Global `shapeMode` is `"circle"` or `"map"` (default `"circle"`).
 3. **County geometry:** `loadCounties()` projects the embedded TopoJSON and stores each county's projected rings and `projArea`; `COUNTIES`, `COUNTY_BY_KEY`, `COUNTY_BY_ID`.
-4. **Results CSV:** `parseResults(text)` returns `{ byId, totals, unmatched, missing }`; `titleFromFilename`.
+4. **Ballot measure data:** `measureToResults(measure)` turns one entry of `data/ballot-measures.json` into `{ byId, totals, unmatched, missing }`. The picker, `showMeasure` and `loadMeasures` are in the page wiring at the bottom.
 5. **Results table:**
    - State: `tableState {key, dir}`, `tableRows`, `tableHoverId`, `tableQuery`, `SORT_GROUPS`, `sortSelect`.
    - Builders: `splitBar`, `fitSegLabels`, `fmtMargin`, `tdMargin`, `tdTotal`, `tdBar`, `fmtShare`, `renderTable`, `setTableData`.
@@ -125,7 +127,7 @@ One inline `<script>` (the one with no attributes). Sections, in order:
 - **Rotation stays free.** A north-up lock (`Body.setInertia(body, Infinity)` after creating the body) was built and then reverted at the user's request.
 - **Circles by default** with an animated morph, because circles pack and compare more cleanly. Only the drawn shape animates; animating collision shapes would mean rebuilding 128 bodies per frame.
 - **Table as a first-class view:** the bar shows share at a glance, counts and differentials sit in a second line, and every number is sortable.
-- **Lenient CSV parsing** that reports problems instead of failing.
+- **Preprocessed JSON instead of in-browser parsing:** a script distills the 830 KB XML into a small file the page fetches; CSV upload was removed.
 - **Hover from the table matches hover on a shape**, including the county name in tooltips.
 
 ## 8. Testing and dev notes
@@ -137,7 +139,7 @@ cd dev-tools && npm install && npx playwright install chromium
 node e2e-test.js        # prints PASS/FAIL per check, exits 1 on any failure
 ```
 
-The suite covers: shape default, table content (bars, counts, margins, totals, footer), row hover from every cell type, canvas hover labels, all 16 sort options, header and dropdown sync, search, and table centering. It all passes against the packaged page.
+The suite serves the repo from a local http server (the page fetches its data) and needs Node 20+ for Playwright. It covers: the measure picker (14 options, deep link, switching), shape default, table content (bars, counts, margins, totals, footer), row hover from every cell type, canvas hover labels, all 16 sort options, header and dropdown sync, search, and table centering. It all passes against the packaged page.
 
 **Not verifiable with the stub** (check in a real browser): actual falling and stacking, jitter, dragging, and the look of the morph animation.
 
@@ -163,7 +165,7 @@ node --check /tmp/page.js
 
 - **Smallest counties are tiny:** about 4 to 6 px wide on an 800×600 container (Kiowa's 107 Yes votes, San Juan's 202 No votes). Raise `CONFIG.fillRatio` (for example 0.5) to enlarge everything.
 - **Phone-width windows:** the table has a minimum width (about 536 px), so the page scrolls sideways below roughly 560 px. This predates the centering change and has not been addressed. Containers do stack.
-- **CSV limits:** comma-delimited only; one row per county (a later duplicate overwrites); first-match header detection, so a header like `No. of Precincts` placed before the real No column would be picked wrongly. Precinct-level data must be totaled by county first.
+- **Statewide Yes/No measures only:** judicial retention, candidate races (including a third-party container) and measures that cover only some counties are not shown yet.
 - **Holes and islands:** only the largest ring gets a collision shape. Other rings and holes are drawn but not collidable, and during a morph only the main ring animates (holes appear at the end). Very concave outlines can briefly self-intersect mid-morph.
 - **Stages 1 and 2** use the older population data and lack the table, circles and linking features.
 - **Not built:** hovering a shape does not highlight its table row.
