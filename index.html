@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colorado ballot measure results by county</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1 id="title">Ballot measure results</h1>
+      <p>Each county’s area is proportional to its votes. Both sides share one scale, so the total area on each side reflects that side’s total votes. Drag counties around.</p>
+      <p id="snapshot-note"></p>
+    </div>
+    <div class="controls">
+      <label class="measure-ctl">
+        Measure
+        <select id="measure" aria-label="Ballot measure" disabled></select>
+      </label>
+      <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
+        Size
+        <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
+        <output id="size-out" for="size">100%</output>
+      </label>
+      <button id="drop" type="button">Drop again</button>
+      <button id="shake" type="button">Shake</button>
+      <button id="shape" type="button" aria-pressed="true">Show map shapes</button>
+      <button id="gravity" type="button" aria-pressed="true">Gravity on</button>
+    </div>
+  </header>
+  <div id="msg" role="status"></div>
+  <main class="stages">
+    <section class="side" data-side="yes">
+      <div class="side-head"><span class="swatch"></span><h2>Yes</h2><span class="total" id="total-yes"></span></div>
+      <div class="stage"><canvas aria-label="Yes votes by county"></canvas></div>
+    </section>
+    <section class="side" data-side="no">
+      <div class="side-head"><span class="swatch"></span><h2>No</h2><span class="total" id="total-no"></span></div>
+      <div class="stage"><canvas aria-label="No votes by county"></canvas></div>
+    </section>
+  </main>
+  <section class="table-section" aria-labelledby="table-title">
+    <h2 id="table-title">Results by county</h2>
+    <div class="table-tools">
+      <label for="county-search" class="sr-only">Search counties</label>
+      <input id="county-search" type="search" placeholder="Search counties" autocomplete="off">
+      <label class="sort-pick">Sort by
+        <select id="sort-select"></select>
+      </label>
+      <span id="table-count" aria-live="polite"></span>
+    </div>
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th scope="col" aria-sort="none"><button type="button" class="sort-btn" data-key="name">County<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="split-head" aria-sort="none">
+            <div class="split-sorts">
+              <button type="button" class="sort-btn" data-key="yes" title="Sort by Yes votes"><span class="sw yes"></span>Yes<span class="arrow" aria-hidden="true"></span></button>
+              <button type="button" class="sort-btn" data-key="share" title="Sort by the Yes share of the vote">% Yes<span class="arrow" aria-hidden="true"></span></button>
+              <button type="button" class="sort-btn" data-key="no" title="Sort by No votes"><span class="sw no"></span>No<span class="arrow" aria-hidden="true"></span></button>
+            </div>
+          </th>
+          <th scope="col" class="ctr" aria-sort="none"><button type="button" class="sort-btn" data-key="margin" title="Net margin in percentage points: Yes share minus No share. Sorts from the biggest Yes lead to the biggest No lead.">Margin<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num" aria-sort="none"><button type="button" class="sort-btn" data-key="total" title="County total votes, with its share of the statewide total underneath">Total<span class="arrow" aria-hidden="true"></span></button></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </section>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/poly-decomp@0.3.0/build/decomp.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -6,41 +6,55 @@ This file is a complete handoff for a new Claude session on a different machine.
 
 A set of standalone HTML pages that draw all 64 Colorado counties with **area proportional to a number**, keeping each county's real outline (or morphing it to a circle), inside 2D physics containers where the shapes fall, stack and can be dragged.
 
-The project grew in three steps. **`colorado-ballot-measure.html` is the current, main deliverable.** The other two pages are earlier stages kept for reference and are not updated with later features.
+The project grew in three steps. **`index.html` is the current, main deliverable.** The other two pages are earlier stages kept for reference and are not updated with later features.
 
 | Stage | File | What it does |
 |---|---|---|
-| 1 | `colorado-counties-by-population.html` | Static layout: counties in rows, largest to smallest, area ∝ 2020 Census population. SVG. |
-| 2 | `colorado-counties-gravity.html` | Same population-scaled shapes dropped into one Matter.js box (drag, Shake, Gravity toggle). |
-| 3 | `colorado-ballot-measure.html` | **Main page.** Two containers, Yes and No, sized by votes on a ballot measure, plus a rich results table. |
+| 1 | `archive/colorado-counties-by-population.html` | Static layout: counties in rows, largest to smallest, area ∝ 2020 Census population. SVG. |
+| 2 | `archive/colorado-counties-gravity.html` | Same population-scaled shapes dropped into one Matter.js box (drag, Shake, Gravity toggle). |
+| 3 | `index.html` | **Main page.** Two containers, Yes and No, sized by votes on a ballot measure, plus a rich results table. |
 
 ## 2. Folder contents
 
 ```
 colorado-county-viz/
 ├── README.md                              this file
-├── colorado-ballot-measure.html           MAIN PAGE (about 420 KB; county shapes embedded)
-├── colorado-counties-gravity.html         stage 2
-├── colorado-counties-by-population.html   stage 1
+├── index.html                             MAIN PAGE (markup only)
+├── css/styles.css                         all page styles
+├── src/                                   ES modules, see section 6
+│   ├── main.js  config.js  state.js  format.js  matter.js
+│   ├── counties.js  results.js  table.js  shapes.js  sim.js
 ├── data/
+│   ├── colorado-topo.js                   trimmed county TopoJSON (what the page imports)
+│   ├── ballot-measures.js                 generated: the 14 statewide ballot measures (what the page imports)
 │   ├── colorado-counties.json             source TopoJSON of the 64 counties (original, untrimmed)
 │   ├── all_co_results.xml                 Secretary of State results snapshot (all contests)
-│   ├── ballot-measures.js                 generated: the 14 statewide ballot measures (what the page loads)
-│   └── amendment_87_results.csv           old sample results (no longer used by the page)
+│   └── amendment_87_results.csv           old sample results (no longer used)
 ├── scripts/
 │   └── build-ballot-measures.mjs          XML -> data/ballot-measures.js
+├── archive/                               stages 1 and 2, self-contained pages kept for reference
+├── .nojekyll                              tells GitHub Pages to serve files as-is
 └── dev-tools/                             optional: headless-browser checks that need no network
-    ├── e2e-test.js                        35 pass/fail checks against the main page
+    ├── e2e-test.js                        37 pass/fail checks against the main page
     ├── matter-stub.js                     stand-in for Matter.js + poly-decomp
     ├── topojson-shim.js                   stand-in for topojson-client
     └── package.json                       playwright + d3 dev dependencies
 ```
 
-The HTML pages are **self-contained**: county shapes and data are embedded inline, so the `data/` files are sources, not runtime dependencies.
+The main page is a static site: `index.html` plus `css/`, `src/` and `data/` loaded by relative URL. Only the `data/*.js` modules are runtime data; the XML and CSV are sources.
 
 ## 3. Running it
 
-No build step, no framework. Open an HTML file in a browser, or serve the folder (`npx serve .`) and visit `/colorado-ballot-measure.html`. The main page loads `data/ballot-measures.js` with a plain `<script src>`, so it also works straight from disk.
+No build step, no framework. The main page uses ES modules, which browsers will not load from `file://`, so serve the folder:
+
+```bash
+npx serve .          # or: python3 -m http.server
+```
+
+then open the address it prints. The two pages in `archive/` are self-contained and still open directly from disk.
+
+### Publishing on GitHub Pages
+The repo is already laid out as a static site (`index.html` at the root, only relative URLs, `.nojekyll`). Push it to GitHub, then **Settings > Pages > Build and deployment > Deploy from a branch**, choose `main` and `/ (root)`. The site appears at `https://<user>.github.io/<repo>/`; `?measure=6060` deep links work there. To update results, replace `data/all_co_results.xml`, run `node scripts/build-ballot-measures.mjs`, commit and push. Keep all URLs relative (no leading `/`), because a project site is served under `/<repo>/`.
 
 Network is needed only to load libraries from CDNs (pinned versions) and Google Fonts (falls back to system fonts):
 
@@ -92,22 +106,24 @@ The script keeps only contests with Choices `Yes/For` and `No/Against` that cove
 - **Population (stages 1 and 2 only):** `POPULATION_2020`, an object keyed by FIPS with `[name, count]`, 2020 Decennial Census.
 - **Amendment 87 sample:** 64 counties, all matching the map. Statewide Yes 1,233,852 and No 1,197,357 (total 2,431,209). Yes share is 50.75%, which displays as **50.8%**, margin **+1.5 Yes**, differential 36,495.
 
-## 6. Code map: `colorado-ballot-measure.html`
+## 6. Code map
 
-One inline `<script>` (the one with no attributes). Sections, in order:
+`index.html` loads the CDN libraries (d3, topojson-client, poly-decomp, Matter.js) as globals, then `<script type="module" src="src/main.js">`. Imports run one way, leaves first: `config`, `format`, `state` and `matter` import nothing from the app; `counties` -> `format`; `results` -> `counties`; `table` -> `counties`, `format`, `state`; `shapes` -> `config`, `format`, `state`, `matter`; `sim` -> most of the above; `main` imports everything.
 
-1. **`CONFIG`**: `fillRatio` 0.40 (share of a container the larger side fills), `simplifyPx` 0.8, `minLabelPx` 46, `dropIntervalMs` 70, `body` (Matter options: friction 0.6, frictionStatic 1, frictionAir 0.02, restitution 0, slop 0.1), `shakeStrength` 1, `morphMs` 550, `morphPoints` 64.
-2. **Shared helpers:** `fmt`, `pct`, `countyLabel(name, side, votes, share)` (the one wording used for every canvas tooltip), `normName`, `msg`. Global `shapeMode` is `"circle"` or `"map"` (default `"circle"`).
-3. **County geometry:** `loadCounties()` projects the embedded TopoJSON and stores each county's projected rings and `projArea`; `COUNTIES`, `COUNTY_BY_KEY`, `COUNTY_BY_ID`.
-4. **Ballot measure data:** `measureToResults(measure)` turns one entry of `data/ballot-measures.js` into `{ byId, totals, unmatched, missing }`. The picker, `showMeasure` and `loadMeasures` are in the page wiring at the bottom.
-5. **Results table:**
-   - State: `tableState {key, dir}`, `tableRows`, `tableHoverId`, `tableQuery`, `SORT_GROUPS`, `sortSelect`.
+1. **`config.js`:** `CONFIG`: `fillRatio` 0.40 (share of a container the larger side fills), `simplifyPx` 0.8, `minLabelPx` 46, `dropIntervalMs` 70, `body` (Matter options: friction 0.6, frictionStatic 1, frictionAir 0.02, restitution 0, slop 0.1), `shakeStrength` 1, `morphMs` 550, `morphPoints` 64.
+2. **`state.js`:** the one shared mutable object `state = { shapeMode, tableHoverId, colors }` (imports are read-only bindings, so shared state lives on an object). `shapeMode` is `"circle"` or `"map"` (default `"circle"`).
+3. **`format.js`:** `fmt`, `pct`, `countyLabel(name, side, votes, share)` (the one wording used for every canvas tooltip), `normName`, `ringArea`, `msg`.
+4. **`matter.js`:** destructures the Matter.js global and registers poly-decomp.
+5. **`counties.js`:** `loadCounties()` projects `data/colorado-topo.js` and stores each county's projected rings and `projArea`; `COUNTIES`, `COUNTY_BY_KEY`, `COUNTY_BY_ID`.
+6. **`results.js`:** `measureToResults(measure)` turns one entry of `data/ballot-measures.js` into `{ byId, totals, unmatched, missing }`.
+7. **`table.js`:** the results table.
+   - State: `tableState {key, dir}`, `tableRows`, `tableQuery`, `SORT_GROUPS`, `sortSelect` (row hover goes through `state.tableHoverId`).
    - Builders: `splitBar`, `fitSegLabels`, `fmtMargin`, `tdMargin`, `tdTotal`, `tdBar`, `fmtShare`, `renderTable`, `setTableData`.
    - Wiring: header click, dropdown change, search input, row hover (`tbody` mouseover uses `tr[data-id]`).
    - Sort keys are `name`, `yes`, `no`, `share`, `margin` (signed), `total`, `absMargin`, `diff`; ties fall back to county name.
-6. **Shape helpers:** `simplify` (Douglas-Peucker), `resample`, `alignTo`, `easeInOut`, `buildCountyBody(c, value, k, mode)`.
-7. **`createSim(side, sectionEl)`:** one Matter engine, runner, mouse and canvas per side; returns `{ resize, drop, morph, shake, setGravity, pick, draw, area }`.
-8. **Page wiring:** `dropBoth()` computes the shared scale, `showResults`, file input, buttons, resize handling, and the `frame()` loop.
+8. **`shapes.js`:** `simplify` (Douglas-Peucker), `resample`, `alignTo`, `easeInOut`, `buildCountyBody(c, value, k, mode)`.
+9. **`sim.js`:** `createSim(side, sectionEl)`: one Matter engine, runner, mouse and canvas per side; returns `{ resize, drop, morph, shake, setGravity, pick, draw, area }`.
+10. **`main.js`:** page wiring: `dropBoth()` computes the shared scale, `showResults`, the measure picker (`showMeasure`, `loadMeasures`), size slider, buttons, resize handling, and the `frame()` loop.
 
 ### Key mechanics
 - **Shared scale:** `k = fillRatio × min(stage areas) / max(totalYes, totalNo)` px² per vote.
@@ -121,7 +137,8 @@ One inline `<script>` (the one with no attributes). Sections, in order:
 ## 7. Key decisions and why
 
 - **Uniform scaling of real outlines in an equal-area projection**: area reads directly as the quantity and outlines stay recognizable.
-- **Everything embedded.** The first version fetched shapes and Census data from the network and was fragile. Now only libraries and fonts load remotely.
+- **No runtime fetches.** Shapes and results are JS modules imported at load, so there is no async loading or CORS to manage; only libraries and fonts come from the network.
+- **ES modules.** The page is split into modules with explicit imports; the cost is that it must be served over http (not opened from disk), which GitHub Pages does anyway.
 - **One shared scale across Yes and No** so the two sides can be compared by eye.
 - **Separate physics worlds per side**, with shared controls.
 - **Rotation stays free.** A north-up lock (`Body.setInertia(body, Infinity)` after creating the body) was built and then reverted at the user's request.
@@ -143,16 +160,13 @@ The suite needs Node 20+ for Playwright. It covers: the measure picker (14 optio
 
 **Not verifiable with the stub** (check in a real browser): actual falling and stacking, jitter, dragging, and the look of the morph animation.
 
-Quick syntax check of the page script after edits:
+Quick syntax check of the modules after edits:
 
 ```bash
-python3 - <<'EOF'
-import re
-h = open('colorado-ballot-measure.html').read()
-open('/tmp/page.js', 'w').write(re.findall(r'<script>(.*?)</script>', h, re.S)[0])
-EOF
-node --check /tmp/page.js
+for f in src/*.js; do node --input-type=module --check < "$f" || echo "BAD $f"; done
 ```
+
+The suite stubs Matter.js, so also look at the page in a real browser after changes (counties falling and stacking, dragging, morph, console errors).
 
 ### Pitfalls already hit
 - **Flex containers swallow a bare leading space.** `" Yes"` after a `<strong>` rendered as `+3.1Yes` once `.margin-main` became flex. The word now lives in its own `<span>` with `white-space: pre`. Check rendered layout, not just `textContent`.

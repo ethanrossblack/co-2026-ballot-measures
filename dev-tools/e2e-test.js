@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end checks for ../colorado-ballot-measure.html in a headless browser, with NO network.
+// End-to-end checks for ../index.html in a headless browser, with NO network.
 //
 // Matter.js, poly-decomp and topojson-client are replaced with the stand-ins in this folder, so
 // bodies sit on a fixed grid instead of falling. That is enough to test hover, labels, the table,
@@ -12,8 +12,10 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
+const http = require('http');
+
 const ROOT = path.resolve(__dirname, '..');
-const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'ballot-measures.js'), 'utf8').replace(/^window\.BALLOT_MEASURES = /, '').replace(/;\s*$/, ''));
+const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'ballot-measures.js'), 'utf8').replace(/^export default /, '').replace(/;\s*$/, ''));
 const MEASURE_KEY = '6060'; // Amendment 87, the measure the table/hover checks run against
 const M = DATA.measures.find(m => m.key === MEASURE_KEY);
 const stateYes = Object.values(M.counties).reduce((a, c) => a + c.yes, 0);
@@ -39,8 +41,18 @@ const ok = (name, cond, detail = '') => {
 };
 const nf = n => n.toLocaleString('en-US');
 
+// The page is made of ES modules, which browsers refuse to load from file://, so serve the repo
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const server = http.createServer((req, res) => {
+  const f = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  const file = fs.existsSync(f) && fs.statSync(f).isDirectory() ? path.join(f, 'index.html') : f;
+  if (!file.startsWith(ROOT) || !fs.existsSync(file)) { res.writeHead(404).end(); return; }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(fs.readFileSync(file));
+});
+
 (async () => {
-  const HTML = 'file://' + path.join(ROOT, 'colorado-ballot-measure.html');
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const HTML = `http://127.0.0.1:${server.address().port}/`;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   const errors = [];
@@ -57,13 +69,15 @@ const nf = n => n.toLocaleString('en-US');
     if (u.includes('d3@')) return route.fulfill({ path: D3, contentType: 'text/javascript' });
     if (u.includes('topojson-client')) return route.fulfill({ path: SHIM, contentType: 'text/javascript' });
     if (u.includes('poly-decomp') || u.includes('matter-js')) return route.fulfill({ path: STUB, contentType: 'text/javascript' });
-    return u.startsWith('file:') ? route.continue() : route.abort();
+    return u.startsWith('http://127.0.0.1') ? route.continue() : route.abort();
   });
 
   await page.goto(`${HTML}?measure=${MEASURE_KEY}`);
   await page.waitForSelector('#measure option', { state: 'attached' });
   await page.waitForTimeout(5500); // let the staggered drop finish (64 counties x 70 ms)
 
+  // Modules keep their state private, so read it by importing the (shared) state module
+  const stateOf = key => page.evaluate(async k => (await import('/src/state.js')).state[k], key);
   const clearTexts = () => page.evaluate(() => { window.__texts = []; });
   const countyLabels = async () => {
     await page.waitForTimeout(250);
@@ -90,7 +104,7 @@ const nf = n => n.toLocaleString('en-US');
 
   // ---- Page basics --------------------------------------------------------------
   ok('page loads with no script errors', errors.length === 0, errors.join(' | '));
-  ok('starts as circles', (await page.evaluate(() => shapeMode)) === 'circle');
+  ok('starts as circles', (await stateOf('shapeMode')) === 'circle');
   ok('shape button offers map shapes', (await page.$eval('#shape', e => e.textContent)) === 'Show map shapes');
 
   // ---- Measure picker -----------------------------------------------------------------
@@ -136,7 +150,7 @@ const nf = n => n.toLocaleString('en-US');
   const A = M.counties.Adams;
   for (const [what, sel] of [['name', 'td.name'], ['bar', 'td.split-cell'], ['margin', 'td.margin-cell'], ['total', 'td.total-cell']]) {
     await adams.locator(sel).hover();
-    const id = await page.evaluate(() => tableHoverId);
+    const id = await stateOf('tableHoverId');
     const labels = await countyLabels();
     ok(`hovering the ${what} cell highlights the county and labels both containers (with name)`,
       id === '08001' && labels.includes(`Adams County: ${nf(A.yes)} yes votes (${(A.yes / (A.yes + A.no) * 100).toFixed(1)}% of county)`) && labels.includes(`Adams County: ${nf(A.no)} no votes (${(A.no / (A.yes + A.no) * 100).toFixed(1)}% of county)`),
@@ -144,7 +158,7 @@ const nf = n => n.toLocaleString('en-US');
   }
   await page.locator('#results-table tfoot tr td').first().hover();
   await page.waitForTimeout(200); await clearTexts();
-  ok('Statewide row does not highlight anything', (await page.evaluate(() => tableHoverId)) === null && (await countyLabels()).length === 0);
+  ok('Statewide row does not highlight anything', (await stateOf('tableHoverId')) === null && (await countyLabels()).length === 0);
 
   // ---- Hover: canvas -> other canvas -----------------------------------------------
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
@@ -219,6 +233,7 @@ const nf = n => n.toLocaleString('en-US');
   ok('table is centered at 1100-1900px wide', centered);
 
   await browser.close();
+  server.close();
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
 })();
