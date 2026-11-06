@@ -25,10 +25,10 @@ colorado-county-viz/
 ├── data/
 │   ├── colorado-counties.json             source TopoJSON of the 64 counties (original, untrimmed)
 │   ├── all_co_results.xml                 Secretary of State results snapshot (all contests)
-│   ├── ballot-measures.json               generated: the 14 statewide ballot measures (what the page loads)
+│   ├── ballot-measures.js                 generated: the 14 statewide ballot measures (what the page loads)
 │   └── amendment_87_results.csv           old sample results (no longer used by the page)
 ├── scripts/
-│   └── build-ballot-measures.mjs          XML -> data/ballot-measures.json
+│   └── build-ballot-measures.mjs          XML -> data/ballot-measures.js
 └── dev-tools/                             optional: headless-browser checks that need no network
     ├── e2e-test.js                        35 pass/fail checks against the main page
     ├── matter-stub.js                     stand-in for Matter.js + poly-decomp
@@ -40,7 +40,7 @@ The HTML pages are **self-contained**: county shapes and data are embedded inlin
 
 ## 3. Running it
 
-No build step, no framework. Serve the folder (`npx serve .`) and visit `/colorado-ballot-measure.html`. The main page fetches `data/ballot-measures.json`, which browsers block on `file://`, so double-clicking it shows a message instead of data. (Stages 1 and 2 are fully self-contained and still open directly.)
+No build step, no framework. Open an HTML file in a browser, or serve the folder (`npx serve .`) and visit `/colorado-ballot-measure.html`. The main page loads `data/ballot-measures.js` with a plain `<script src>`, so it also works straight from disk.
 
 Network is needed only to load libraries from CDNs (pinned versions) and Google Fonts (falls back to system fonts):
 
@@ -80,7 +80,7 @@ The **Measure** picker in the header lists the statewide ballot measures (curren
 **Refreshing the data:** replace `data/all_co_results.xml` with a newer Secretary of State export, then run
 
 ```bash
-node scripts/build-ballot-measures.mjs        # optional args: [input.xml] [output.json]
+node scripts/build-ballot-measures.mjs        # optional args: [input.xml] [output.js]
 ```
 
 The script keeps only contests with Choices `Yes/For` and `No/Against` that cover all 64 counties. Judicial retention (plain `Yes`/`No`), candidate races and partial-county measures are skipped and counted in its summary. It fails loudly if a measure lacks a county or the county votes don't add up to the XML's `totalVotes`. Needs Node 16+, no packages.
@@ -99,7 +99,7 @@ One inline `<script>` (the one with no attributes). Sections, in order:
 1. **`CONFIG`**: `fillRatio` 0.40 (share of a container the larger side fills), `simplifyPx` 0.8, `minLabelPx` 46, `dropIntervalMs` 70, `body` (Matter options: friction 0.6, frictionStatic 1, frictionAir 0.02, restitution 0, slop 0.1), `shakeStrength` 1, `morphMs` 550, `morphPoints` 64.
 2. **Shared helpers:** `fmt`, `pct`, `countyLabel(name, side, votes, share)` (the one wording used for every canvas tooltip), `normName`, `msg`. Global `shapeMode` is `"circle"` or `"map"` (default `"circle"`).
 3. **County geometry:** `loadCounties()` projects the embedded TopoJSON and stores each county's projected rings and `projArea`; `COUNTIES`, `COUNTY_BY_KEY`, `COUNTY_BY_ID`.
-4. **Ballot measure data:** `measureToResults(measure)` turns one entry of `data/ballot-measures.json` into `{ byId, totals, unmatched, missing }`. The picker, `showMeasure` and `loadMeasures` are in the page wiring at the bottom.
+4. **Ballot measure data:** `measureToResults(measure)` turns one entry of `data/ballot-measures.js` into `{ byId, totals, unmatched, missing }`. The picker, `showMeasure` and `loadMeasures` are in the page wiring at the bottom.
 5. **Results table:**
    - State: `tableState {key, dir}`, `tableRows`, `tableHoverId`, `tableQuery`, `SORT_GROUPS`, `sortSelect`.
    - Builders: `splitBar`, `fitSegLabels`, `fmtMargin`, `tdMargin`, `tdTotal`, `tdBar`, `fmtShare`, `renderTable`, `setTableData`.
@@ -127,7 +127,7 @@ One inline `<script>` (the one with no attributes). Sections, in order:
 - **Rotation stays free.** A north-up lock (`Body.setInertia(body, Infinity)` after creating the body) was built and then reverted at the user's request.
 - **Circles by default** with an animated morph, because circles pack and compare more cleanly. Only the drawn shape animates; animating collision shapes would mean rebuilding 128 bodies per frame.
 - **Table as a first-class view:** the bar shows share at a glance, counts and differentials sit in a second line, and every number is sortable.
-- **Preprocessed JSON instead of in-browser parsing:** a script distills the 830 KB XML into a small file the page fetches; CSV upload was removed.
+- **Preprocessed JSON instead of in-browser parsing:** a script distills the 830 KB XML into a small script file the page loads; CSV upload was removed.
 - **Hover from the table matches hover on a shape**, including the county name in tooltips.
 
 ## 8. Testing and dev notes
@@ -139,7 +139,7 @@ cd dev-tools && npm install && npx playwright install chromium
 node e2e-test.js        # prints PASS/FAIL per check, exits 1 on any failure
 ```
 
-The suite serves the repo from a local http server (the page fetches its data) and needs Node 20+ for Playwright. It covers: the measure picker (14 options, deep link, switching), shape default, table content (bars, counts, margins, totals, footer), row hover from every cell type, canvas hover labels, all 16 sort options, header and dropdown sync, search, and table centering. It all passes against the packaged page.
+The suite needs Node 20+ for Playwright. It covers: the measure picker (14 options, deep link, switching), shape default, table content (bars, counts, margins, totals, footer), row hover from every cell type, canvas hover labels, all 16 sort options, header and dropdown sync, search, and table centering. It all passes against the packaged page.
 
 **Not verifiable with the stub** (check in a real browser): actual falling and stacking, jitter, dragging, and the look of the morph animation.
 

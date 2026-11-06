@@ -12,23 +12,14 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const http = require('http');
-
 const ROOT = path.resolve(__dirname, '..');
-const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'ballot-measures.json'), 'utf8'));
+const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'ballot-measures.js'), 'utf8').replace(/^window\.BALLOT_MEASURES = /, '').replace(/;\s*$/, ''));
 const MEASURE_KEY = '6060'; // Amendment 87, the measure the table/hover checks run against
 const M = DATA.measures.find(m => m.key === MEASURE_KEY);
 const stateYes = Object.values(M.counties).reduce((a, c) => a + c.yes, 0);
 const stateNo = Object.values(M.counties).reduce((a, c) => a + c.no, 0);
 const stateTotal = stateYes + stateNo;
 
-// The page fetches data/ballot-measures.json, which browsers block on file://, so serve the repo
-const TYPES = { '.html': 'text/html', '.json': 'application/json' };
-const server = http.createServer((req, res) => {
-  const f = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/$/, '/colorado-ballot-measure.html'));
-  if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404).end(); return; }
-  res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }).end(fs.readFileSync(f));
-});
 
 function findD3() {
   for (const dir of require.resolve.paths('d3') || []) {
@@ -49,8 +40,7 @@ const ok = (name, cond, detail = '') => {
 const nf = n => n.toLocaleString('en-US');
 
 (async () => {
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const HTML = `http://127.0.0.1:${server.address().port}/colorado-ballot-measure.html`;
+  const HTML = 'file://' + path.join(ROOT, 'colorado-ballot-measure.html');
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   const errors = [];
@@ -67,7 +57,7 @@ const nf = n => n.toLocaleString('en-US');
     if (u.includes('d3@')) return route.fulfill({ path: D3, contentType: 'text/javascript' });
     if (u.includes('topojson-client')) return route.fulfill({ path: SHIM, contentType: 'text/javascript' });
     if (u.includes('poly-decomp') || u.includes('matter-js')) return route.fulfill({ path: STUB, contentType: 'text/javascript' });
-    return u.startsWith('http://127.0.0.1') ? route.continue() : route.abort();
+    return u.startsWith('file:') ? route.continue() : route.abort();
   });
 
   await page.goto(`${HTML}?measure=${MEASURE_KEY}`);
@@ -229,7 +219,6 @@ const nf = n => n.toLocaleString('en-US');
   ok('table is centered at 1100-1900px wide', centered);
 
   await browser.close();
-  server.close();
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
 })();

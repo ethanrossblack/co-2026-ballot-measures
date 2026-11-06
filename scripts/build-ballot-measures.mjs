@@ -1,11 +1,13 @@
 // Extracts the statewide ballot measures (Yes/For vs No/Against, all 64 counties)
-// from a Secretary of State results XML snapshot into a small JSON file.
+// from a Secretary of State results XML snapshot into a small script file that
+// sets window.BALLOT_MEASURES. (A plain <script src> works when the page is opened
+// straight from disk, which fetch() of a JSON file does not.)
 //
-// Usage: node scripts/build-ballot-measures.mjs [input.xml] [output.json]
+// Usage: node scripts/build-ballot-measures.mjs [input.xml] [output.js]
 import { readFileSync, writeFileSync } from "node:fs";
 
 const input = process.argv[2] ?? "data/all_co_results.xml";
-const output = process.argv[3] ?? "data/ballot-measures.json";
+const output = process.argv[3] ?? "data/ballot-measures.js";
 
 const ENTITIES = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };
 const decode = s => s.replace(/&(amp|lt|gt|quot|apos);/g, m => ENTITIES[m]);
@@ -76,7 +78,7 @@ const out = {
   snapshot: tag(xml, "Timestamp"),
   measures
 };
-writeFileSync(output, JSON.stringify(out) + "\n");
+writeFileSync(output, `window.BALLOT_MEASURES = ${JSON.stringify(out)};\n`);
 
 console.log(`${measures.length} ballot measures -> ${output}`);
 for (const m of measures) console.log(`  ${m.key}  ${m.title}  (${m.precinctsReportingPercent}% of precincts reporting)`);
