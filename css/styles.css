@@ -204,3 +204,25 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
   .stages { grid-template-columns: 1fr; height: auto; }
   .stage { min-height: 65vh; }
 }
+/* Phones: tighten the table so it fits without sideways scrolling */
+@media (max-width: 560px) {
+  th, td { padding: .35rem .3rem; }
+  td.name { font-size: .9rem; overflow-wrap: anywhere; }
+  td.split-cell { width: auto; }
+  .seg { padding: 0 .25rem; font-size: .72rem; }
+  .split-counts, .margin-sub, .total-sub { font-size: .72rem; }
+  .margin-main, .total-main { font-size: .85rem; }
+  .table-section button.sort-btn { font-size: .8rem; }
+  .sort-btn .arrow, .sw { display: none; }
+  .split-sorts { gap: .4rem; }
+  .controls { margin-left: 0; width: 100%; }
+  .measure-ctl { width: 100%; }
+  .measure-ctl select { flex: 1; min-width: 0; max-width: none; }
+}
+@media (max-width: 380px) {
+  .table-section { padding-left: .5rem; padding-right: .5rem; }
+  th, td { padding-left: .2rem; padding-right: .2rem; }
+  td.name { font-size: .85rem; }
+  .split-counts, .margin-sub, .total-sub { font-size: .66rem; }
+  .margin-main, .total-main { font-size: .8rem; }
+}

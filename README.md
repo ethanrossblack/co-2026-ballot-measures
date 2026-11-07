@@ -11,7 +11,7 @@ Both containers share one scale, so you can compare the Yes and No sides by eye:
 - **Play with it.** Drag or fling any county, shake the containers, turn gravity off, or use the **Size** slider to scale every shape.
 - **Linked highlighting.** Hover a county in either container, or anywhere on its table row, and it lights up in both containers with a label such as `Adams County: 100,137 yes votes (52.4% of county)`.
 - **Results table.** Yes/No bar, margin, and total for every county plus a statewide row. Search by name and sort 16 ways (by county, Yes, No, % Yes, margin, total, closest races, vote differential).
-- Light and dark mode, and a stacked layout on narrow screens.
+- Light and dark mode, and a stacked layout on narrow screens (the table fits phone widths without sideways scrolling).
 
 Results come from a Secretary of State snapshot, so they are only as final as that snapshot. The page shows the percentage of precincts reporting and the snapshot time under the title.
 
@@ -105,7 +105,7 @@ for f in src/*.js; do node --input-type=module --check < "$f" || echo "BAD $f"; 
 
 - Only statewide Yes/No measures are shown. Judicial retention, candidate races and measures covering part of the state are not.
 - The smallest counties are only a few pixels wide on a small container (e.g. Kiowa, San Juan). Use the Size slider to enlarge everything.
-- The results table has a minimum width, so very narrow windows (under about 560 px) scroll sideways.
+- On phones the table drops its sort arrows and uses smaller type to fit; checked down to 320 px wide. Use the sort dropdown for the full set of sorts.
 - Only a county's largest outline is collidable; islands and holes are drawn but pass through other shapes, and during the circle-to-map morph holes appear at the end.
 - Hovering a shape does not highlight its table row.
 
