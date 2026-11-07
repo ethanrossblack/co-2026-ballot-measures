@@ -13,7 +13,7 @@ window.decomp = {};
       b.position = { x: p.x, y: p.y };
       b.bounds = { min: { x: p.x - w / 2, y: p.y - h / 2 }, max: { x: p.x + w / 2, y: p.y + h / 2 } };
     },
-    setVelocity(b, v) { b.velocity = v; }, setAngle(b, a) { b.angle = a; }, setAngularVelocity: noop, setInertia: noop
+    setVelocity(b, v) { b.velocity = v; }, setAngle(b, a) { b.angle = a; }, setAngularVelocity: noop, setInertia: noop, setStatic: noop, applyForce: noop
   };
   window.Matter = {
     Engine: { create() { return { world: {}, gravity: { y: 1 } }; } },

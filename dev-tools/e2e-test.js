@@ -232,6 +232,17 @@ const server = http.createServer((req, res) => {
   }
   ok('table is centered at 1100-1900px wide', centered);
 
+  // ---- Layout toggle (map layout) -----------------------------------------------
+  ok('starts in falling layout', (await stateOf('layoutMode')) === 'fall' && !(await page.$eval('#gravity', e => e.disabled)));
+  await page.click('#layout');
+  ok('map layout: state, outlines, gravity disabled',
+    (await stateOf('layoutMode')) === 'map' && (await stateOf('shapeMode')) === 'map' && (await page.$eval('#gravity', e => e.disabled)));
+  ok('map layout: button offers the way back', (await page.$eval('#layout', e => e.textContent)) === 'Back to falling');
+  await page.click('#layout');
+  ok('back to falling re-enables gravity', (await stateOf('layoutMode')) === 'fall' && !(await page.$eval('#gravity', e => e.disabled)));
+  await page.click('#shape'); // restore circles for the checks below
+  ok('layout toggling leaves no script errors', errors.length === 0, errors.join(' | '));
+
   await browser.close();
   server.close();
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed');

@@ -7,5 +7,11 @@ export const CONFIG = {
   body: { friction: 0.6, frictionStatic: 1, frictionAir: 0.02, restitution: 0, slop: 0.1 },
   shakeStrength: 1,
   morphMs: 550,          // duration of the outline <-> circle animation
+  mapFillRatio: 0.30,    // map layout: like fillRatio but lower, since hulls need room to avoid touching
+  mapHoldMs: 1000,       // map layout: how long the true state shape is shown before resizing
+  mapGrowMs: 1400,       // map layout: duration of the resize to vote-proportional areas
+  mapMargin: 0.92,       // map layout: share of the stage the starting state map spans
+  homeDamping: 0.93,     // map layout: per-step velocity retention, so pushed counties stop quickly
+  returnMs: 900,         // map layout: how long counties glide home after a drag
   morphPoints: 64        // points each shape is resampled to for the animation
 };

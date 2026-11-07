@@ -26,8 +26,25 @@ function dropBoth() {
   const { totals } = current;
   // One shared scale: the side with more votes fills `fillRatio` of the smaller stage
   // The size slider scales linear dimensions, so area scales with its square
-  const k = (sizeFactor ** 2 * CONFIG.fillRatio * Math.min(...sims.map(s => s.area()))) / Math.max(totals.yes, totals.no);
+  const k = (sizeFactor ** 2 * (state.layoutMode === "map" ? CONFIG.mapFillRatio : CONFIG.fillRatio) * Math.min(...sims.map(s => s.area()))) / Math.max(totals.yes, totals.no);
   sims.forEach(s => s.drop(current, k));
+  syncDropBtn();
+}
+
+// In the map layout this button switches between the physical map and the vote-proportional
+// layout (with an animation); in the falling layout it replays the drop.
+const dropBtn = document.getElementById("drop");
+function syncDropBtn() {
+  if (state.layoutMode !== "map") {
+    dropBtn.textContent = "Drop again";
+    dropBtn.title = "Drop the counties again";
+    return;
+  }
+  const toProportional = sims[0].viewTarget() === "proportional";
+  dropBtn.textContent = toProportional ? "Show physical map" : "Show vote-proportional map";
+  dropBtn.title = toProportional
+    ? "Animate back to the real shape and position of every county"
+    : "Animate each county to its vote area, spaced so none touch";
 }
 
 function showResults(res, title) {
@@ -55,7 +72,11 @@ sizeInput.addEventListener("change", () => {
   sizeFactor = Number(sizeInput.value);
   dropBoth();
 });
-document.getElementById("drop").addEventListener("click", dropBoth);
+dropBtn.addEventListener("click", () => {
+  if (state.layoutMode !== "map") return dropBoth();
+  sims.forEach(s => s.toggleView());
+  syncDropBtn();
+});
 document.getElementById("shake").addEventListener("click", () => sims.forEach(s => s.shake()));
 const shapeBtn = document.getElementById("shape");
 shapeBtn.addEventListener("click", () => {
@@ -65,17 +86,40 @@ shapeBtn.addEventListener("click", () => {
   sims.forEach(s => s.morph(state.shapeMode));
 });
 const gravityBtn = document.getElementById("gravity");
+const gravityOn = () => gravityBtn.getAttribute("aria-pressed") === "true";
 gravityBtn.addEventListener("click", () => {
-  const on = gravityBtn.getAttribute("aria-pressed") !== "true";
+  const on = !gravityOn();
   gravityBtn.setAttribute("aria-pressed", String(on));
   gravityBtn.textContent = on ? "Gravity on" : "Gravity off";
   sims.forEach(s => { s.setGravity(on); if (!on) s.shake(); });
 });
 
+// Layout: "fall" drops counties into a pile; "map" starts as the state and resizes in place
+const layoutBtn = document.getElementById("layout");
+function setLayout(mode, { redrop = true } = {}) {
+  state.layoutMode = mode;
+  const map = mode === "map";
+  layoutBtn.setAttribute("aria-pressed", String(map));
+  layoutBtn.textContent = map ? "Back to falling" : "Try map layout";
+  gravityBtn.disabled = map; // the springs replace gravity
+  sims.forEach(s => s.setGravity(gravityOn()));
+  if (map && state.shapeMode !== "map") { // outlines show the state; the re-drop below builds them
+    state.shapeMode = "map";
+    shapeBtn.setAttribute("aria-pressed", "false");
+    shapeBtn.textContent = "Show as circles";
+  }
+  if (redrop) dropBoth(); else syncDropBtn();
+}
+layoutBtn.addEventListener("click", () => setLayout(state.layoutMode === "map" ? "fall" : "map"));
+
 let resizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { sims.forEach(s => s.resize()); fitSegLabels(); }, 150);
+  resizeTimer = setTimeout(() => {
+    sims.forEach(s => s.resize());
+    fitSegLabels();
+    if (state.layoutMode === "map") dropBoth(); // the starting map depends on the stage size
+  }, 150);
 });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readColors);
 
@@ -107,6 +151,8 @@ function showMeasure(key, { updateUrl = true } = {}) {
     history.replaceState(null, "", url);
   }
 }
+
+if (new URLSearchParams(location.search).get("layout") === "map") setLayout("map", { redrop: false });
 
 measureSelect.addEventListener("change", () => showMeasure(measureSelect.value));
 
