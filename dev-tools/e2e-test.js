@@ -161,7 +161,7 @@ const server = http.createServer((req, res) => {
   ok('Statewide row does not highlight anything', (await stateOf('tableHoverId')) === null && (await countyLabels()).length === 0);
 
   // ---- Hover: canvas -> other canvas -----------------------------------------------
-  await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
+  await page.locator('.side[data-side="yes"] canvas').scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
   const yc = await page.locator('.side[data-side="yes"] canvas').boundingBox();
   await page.mouse.move(yc.x + 85, yc.y + 85); await page.mouse.move(yc.x + 90, yc.y + 90);
   await page.waitForTimeout(200); await clearTexts();
