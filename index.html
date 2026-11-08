@@ -48,13 +48,19 @@
       <h2 id="margin-title">Margin map</h2>
       <span class="legend"><span class="swatch yes"></span>Yes won<span class="swatch no"></span>No won</span>
       <span class="mm-total"></span>
-      <button class="mm-toggle" type="button">Show physical map</button>
+      <span class="mm-buttons">
+        <button class="mm-toggle" type="button">Show physical map</button>
+        <button class="mm-prev" type="button" hidden>Back</button>
+        <button class="mm-next" type="button">Group by winner</button>
+      </span>
     </div>
-    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow.</p>
+    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow. “Group by winner” moves each county to its side, split at the statewide vote ratio, and then folds them into a Yes/No pie chart.</p>
+    <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
     <div class="stage"><canvas aria-label="Vote margin by county"></canvas></div>
   </section>
   <section class="table-section" aria-labelledby="table-title">
     <h2 id="table-title">Results by county</h2>
+    <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
     <div class="table-tools">
       <label for="county-search" class="sr-only">Search counties</label>
       <input id="county-search" type="search" placeholder="Search counties" autocomplete="off">

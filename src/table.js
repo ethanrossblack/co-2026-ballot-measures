@@ -80,7 +80,7 @@ function splitBar(name, yes, no) {
 
 // Hide a percentage label when its segment is too narrow to hold it
 export function fitSegLabels() {
-  document.querySelectorAll("#results-table .seg").forEach(seg => {
+  document.querySelectorAll(".seg").forEach(seg => {
     const lab = seg.firstElementChild;
     const cs = getComputedStyle(seg);
     const room = seg.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
@@ -205,6 +205,9 @@ export function setTableData(res) {
       pctState: grand ? total / grand : 0      // county total as a share of the statewide total
     };
   });
+  // The same Yes/No bar, standalone, above the margin map and at the top of the table
+  document.querySelectorAll(".statewide-bar").forEach(el =>
+    el.replaceChildren(splitBar("Statewide", res.totals.yes, res.totals.no)));
   const tr = document.createElement("tr");
   tr.append(td("Statewide"), tdBar("Statewide", res.totals.yes, res.totals.no),
     tdMargin(res.totals.yes, res.totals.no), tdTotal(grand, grand ? 1 : 0));

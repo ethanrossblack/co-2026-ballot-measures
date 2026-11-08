@@ -31,7 +31,7 @@ function simplify(points, tol) {
 }
 
 // Resample a closed ring to n points spaced evenly along its perimeter
-function resample(ring, n) {
+export function resample(ring, n) {
   const pts = ring.concat([ring[0]]);
   const seg = [];
   let total = 0;

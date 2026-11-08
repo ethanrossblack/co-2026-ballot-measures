@@ -111,7 +111,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: 
 .margin-head .swatch.yes { background: var(--yes); }
 .margin-head .swatch.no { background: var(--no); }
 .mm-total { color: var(--muted); font-variant-numeric: tabular-nums; }
-.mm-toggle { margin-left: auto; }
+.mm-buttons { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5rem; }
+.mm-buttons [hidden] { display: none; }
+.statewide { max-width: 58rem; margin: 0 0 .75rem; }
+.statewide-cap { display: block; margin-bottom: .2rem; color: var(--muted); font-size: .9rem; }
 .margin-note { margin: .3rem 0 .6rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
 .margin-section .stage { flex: none; height: max(420px, 75vh); }
 /* Heading, search/sort bar and table share one column, centered once the window is wider than it */
