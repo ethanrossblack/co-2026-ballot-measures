@@ -20,16 +20,6 @@
         Measure
         <select id="measure" aria-label="Ballot measure" disabled></select>
       </label>
-      <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
-        Size
-        <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
-        <output id="size-out" for="size">100%</output>
-      </label>
-      <button id="drop" type="button">Drop again</button>
-      <button id="layout" type="button" aria-pressed="false" title="Experimental: start as the state of Colorado, then resize each county to its votes">Try map layout</button>
-      <button id="shake" type="button">Shake</button>
-      <button id="shape" type="button" aria-pressed="true">Show map shapes</button>
-      <button id="gravity" type="button" aria-pressed="true">Gravity on</button>
     </div>
   </header>
   <div id="msg" role="status"></div>
@@ -48,6 +38,18 @@
     <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
     <div class="stage"><canvas aria-label="Vote margin by county"></canvas></div>
   </section>
+  <div class="controls stage-controls">
+    <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
+      Size
+      <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
+      <output id="size-out" for="size">100%</output>
+    </label>
+    <button id="drop" type="button">Drop again</button>
+    <button id="layout" type="button" aria-pressed="false" title="Experimental: start as the state of Colorado, then resize each county to its votes">Try map layout</button>
+    <button id="shake" type="button">Shake</button>
+    <button id="shape" type="button" aria-pressed="true">Show map shapes</button>
+    <button id="gravity" type="button" aria-pressed="true">Gravity on</button>
+  </div>
   <main class="stages">
     <section class="side" data-side="yes">
       <div class="side-head"><span class="swatch"></span><h2>Yes</h2><span class="total" id="total-yes"></span></div>

@@ -53,6 +53,7 @@ h1 {
 }
 header p { margin: .2rem 0 0; color: var(--muted); font-size: .95rem; max-width: 70ch; }
 .controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; }
+.stage-controls { margin-left: 0; align-items: center; padding: .5rem var(--pad) 0; }
 button {
   font: 600 .9rem "Barlow", system-ui, sans-serif;
   color: var(--ink);
