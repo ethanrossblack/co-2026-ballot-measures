@@ -28,7 +28,7 @@ export function createMarginMap(sectionEl) {
   let W = 0, H = 0, dpr = 1, mapM = 1;
   let res = null, items = [], overlaps = 0;
   let split = { x: 0, share: 0.5, pie: null }; // divider x, statewide Yes share of the vote, pie geometry
-  let anim = { from: 1, to: 1, t0: 0, dur: 1 }; // stage progress P: from -> to
+  let anim = { from: 0, to: 0, t0: 0, dur: 1 }; // stage progress P: from -> to (starts on the real map)
   let pointer = null; // pointer position in stage pixels, or null when outside
 
   canvas.addEventListener("pointermove", e => {
@@ -160,10 +160,11 @@ export function createMarginMap(sectionEl) {
     if (res) restart();
   }
 
-  // Show the real state, hold, then resize every county to its margin
+  // New data or a new stage size: rebuild the layout and stay on the current stage. Moving
+  // between stages only happens when a button is pressed.
   function restart() {
     rebuild();
-    anim = { from: 0, to: 1, t0: performance.now() + CONFIG.mapHoldMs, dur: CONFIG.mapGrowMs };
+    anim = { from: anim.to, to: anim.to, t0: performance.now(), dur: 1 };
     syncButtons();
   }
 
