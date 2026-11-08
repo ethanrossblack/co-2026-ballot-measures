@@ -166,7 +166,8 @@ const server = http.createServer((req, res) => {
   await page.mouse.move(yc.x + 85, yc.y + 85); await page.mouse.move(yc.x + 90, yc.y + 90);
   await page.waitForTimeout(200); await clearTexts();
   const onYes = await countyLabels();
-  ok('hovering a shape labels both containers', onYes.length === 2 && onYes.every(t => t.startsWith('Denver County:')), JSON.stringify(onYes));
+  ok('hovering a shape labels both containers and the margin map',
+    onYes.length === 3 && onYes.every(t => t.startsWith('Denver County:')) && onYes.some(t => /Denver County: (Yes|No) by [\d,]+ votes \(\d+\.\d% margin\)/.test(t)), JSON.stringify(onYes));
   await page.mouse.move(600, 5);
 
   // ---- Switching measures -------------------------------------------------------------

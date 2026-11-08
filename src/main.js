@@ -3,6 +3,7 @@ import { fmt, msg, pct } from "./format.js";
 import { measureToResults } from "./results.js";
 import { fitSegLabels, setTableData } from "./table.js";
 import { createSim } from "./sim.js";
+import { createMarginMap } from "./marginmap.js";
 import { state } from "./state.js";
 import BALLOT_MEASURES from "../data/ballot-measures.js";
 
@@ -10,6 +11,7 @@ import BALLOT_MEASURES from "../data/ballot-measures.js";
 
 const sims = ["yes", "no"].map(side =>
   createSim(side, document.querySelector(`.side[data-side="${side}"]`)));
+const marginMap = createMarginMap(document.querySelector(".margin-section"));
 let current = null;
 
 function readColors() {
@@ -61,6 +63,7 @@ function showResults(res, title) {
   msg(notes.join(" "));
   setTableData(res);
   dropBoth();
+  marginMap.setData(res);
 }
 
 const sizeInput = document.getElementById("size");
@@ -117,6 +120,7 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     sims.forEach(s => s.resize());
+    marginMap.resize();
     fitSegLabels();
     if (state.layoutMode === "map") dropBoth(); // the starting map depends on the stage size
   }, 150);
@@ -125,16 +129,18 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rea
 
 function frame() {
   // Whichever side the pointer is on drives the highlight on both sides
-  const picks = sims.map(s => s.pick());
+  const picks = [...sims.map(s => s.pick()), marginMap.pick()];
   const source = picks.findIndex(id => id !== null);
   // A pointer on a canvas wins; otherwise use the county hovered in the table
   const id = source >= 0 ? picks[source] : state.tableHoverId;
   sims.forEach((s, i) => s.draw(state.colors, id, i === source));
+  marginMap.draw(state.colors, id, source === sims.length);
   requestAnimationFrame(frame);
 }
 
 readColors();
 sims.forEach(s => s.resize());
+marginMap.resize();
 
 const measureSelect = document.getElementById("measure");
 let measureData = null;

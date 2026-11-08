@@ -43,6 +43,16 @@
       <div class="stage"><canvas aria-label="No votes by county"></canvas></div>
     </section>
   </main>
+  <section class="margin-section" aria-labelledby="margin-title">
+    <div class="margin-head">
+      <h2 id="margin-title">Margin map</h2>
+      <span class="legend"><span class="swatch yes"></span>Yes won<span class="swatch no"></span>No won</span>
+      <span class="mm-total"></span>
+      <button class="mm-toggle" type="button">Show physical map</button>
+    </div>
+    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow.</p>
+    <div class="stage"><canvas aria-label="Vote margin by county"></canvas></div>
+  </section>
   <section class="table-section" aria-labelledby="table-title">
     <h2 id="table-title">Results by county</h2>
     <div class="table-tools">

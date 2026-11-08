@@ -102,6 +102,18 @@ button:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
   overflow: hidden;
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.margin-section { flex: none; padding: .25rem var(--pad) var(--pad); }
+.margin-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; }
+.margin-head h2 { font: 600 1.5rem/1 "Barlow Condensed", "Barlow", sans-serif; margin: 0; }
+.margin-head .legend { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .9rem; }
+.margin-head .legend .swatch { width: .8rem; height: .8rem; border-radius: 2px; margin-left: .5rem; }
+.margin-head .legend .swatch:first-child { margin-left: 0; }
+.margin-head .swatch.yes { background: var(--yes); }
+.margin-head .swatch.no { background: var(--no); }
+.mm-total { color: var(--muted); font-variant-numeric: tabular-nums; }
+.mm-toggle { margin-left: auto; }
+.margin-note { margin: .3rem 0 .6rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+.margin-section .stage { flex: none; height: max(420px, 75vh); }
 /* Heading, search/sort bar and table share one column, centered once the window is wider than it */
 .table-section {
   width: 100%;
