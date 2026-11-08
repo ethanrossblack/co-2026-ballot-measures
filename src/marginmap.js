@@ -316,6 +316,16 @@ export function createMarginMap(sectionEl) {
     ctx.clearRect(0, 0, W, H);
     const now = performance.now(), P = progress(now);
     ctx.lineJoin = "round";
+    // The whole container is tinted for the statewide winner, except while the two halves are
+    // tinted for their own sides (stage 2); the two tints trade places between stages
+    if (res && res.totals.yes !== res.totals.no) {
+      const groupedTint = P <= 1 ? 0 : Math.min(P - 1, 1, 3 - P);
+      ctx.save();
+      ctx.globalAlpha = 0.16 * (1 - groupedTint);
+      ctx.fillStyle = colors[res.totals.yes > res.totals.no ? "yes" : "no"];
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
     drawSplit(colors, P);
 
     for (const it of items) {
