@@ -220,6 +220,15 @@ sims.forEach(s => s.resize());
 marginMap.resize();
 
 const measureSelect = document.getElementById("measure");
+
+// The picker bar sticks to the top: publish its height so the table's sticky header sits
+// below it, and give it a shadow once the page has scrolled under it
+const measureBar = document.querySelector(".measure-bar");
+new ResizeObserver(() =>
+  document.documentElement.style.setProperty("--bar-h", `${measureBar.offsetHeight}px`)).observe(measureBar);
+const syncBarShadow = () => measureBar.classList.toggle("stuck", window.scrollY > 0);
+window.addEventListener("scroll", syncBarShadow, { passive: true });
+syncBarShadow();
 let measureData = null;
 
 function showMeasure(key, { updateUrl = true } = {}) {

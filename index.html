@@ -9,6 +9,13 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <!-- Sticks to the top of the viewport so the current measure stays in view while scrolling -->
+  <div class="measure-bar">
+    <label class="measure-ctl">
+      Measure
+      <select id="measure" aria-label="Ballot measure" disabled></select>
+    </label>
+  </div>
   <header>
     <div class="measure-head">
       <h1 id="title">Ballot measure results</h1>
@@ -25,12 +32,6 @@
         <p id="ballot-title-note" class="ballot-title-note"></p>
       </details>
       <p class="measure-source" id="measure-source"></p>
-    </div>
-    <div class="controls">
-      <label class="measure-ctl">
-        Measure
-        <select id="measure" aria-label="Ballot measure" disabled></select>
-      </label>
     </div>
   </header>
   <div id="msg" role="status"></div>

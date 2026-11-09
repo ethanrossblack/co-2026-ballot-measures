@@ -265,6 +265,24 @@ const server = http.createServer((req, res) => {
   }
   ok('table is centered at 1100-1900px wide', centered);
 
+  // ---- Sticky measure bar -----------------------------------------------------------
+  for (const w of [1280, 375]) {
+    await page.setViewportSize({ width: w, height: 800 });
+    await page.evaluate(() => document.querySelector('#results-table tbody tr:nth-child(20)').scrollIntoView());
+    await page.waitForTimeout(250);
+    const g = await page.evaluate(() => {
+      const bar = document.querySelector('.measure-bar').getBoundingClientRect();
+      const th = document.querySelector('#results-table thead th').getBoundingClientRect();
+      return { barTop: bar.top, barBottom: bar.bottom, thTop: th.top, stuck: document.querySelector('.measure-bar').classList.contains('stuck'),
+        sel: getComputedStyle(document.getElementById('measure')).visibility };
+    });
+    ok(`measure bar stays on top and the table header sits under it (${w}px)`,
+      g.barTop === 0 && g.stuck && g.sel === 'visible' && Math.abs(g.thTop - g.barBottom) < 1, JSON.stringify(g));
+  }
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(200);
+
   // ---- Layout toggle (map layout) -----------------------------------------------
   ok('starts in falling layout', (await stateOf('layoutMode')) === 'fall' && !(await page.$eval('#gravity', e => e.disabled)));
   await page.click('#layout');

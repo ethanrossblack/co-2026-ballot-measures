@@ -45,7 +45,7 @@ header {
   flex-wrap: wrap;
   align-items: start;
   gap: .75rem 2rem;
-  padding: 1rem var(--pad) .5rem;
+  padding: .5rem var(--pad);
 }
 h1 {
   font: 600 clamp(1.4rem, 3vw, 2rem)/1.1 "Barlow Condensed", "Barlow", sans-serif;
@@ -93,6 +93,14 @@ button {
 button:hover { background: var(--hover-bg); }
 button:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
 #gravity[aria-pressed="false"] { color: var(--muted); border-style: dashed; }
+/* Measure picker bar, stuck to the top of the viewport; --bar-h (set in main.js) offsets the table header */
+.measure-bar {
+  position: sticky; top: 0; z-index: 10;
+  padding: .5rem var(--pad);
+  background: var(--paper);
+  border-bottom: 1.5px solid transparent;
+}
+.measure-bar.stuck { border-bottom-color: var(--rule); box-shadow: 0 2px 6px rgb(0 0 0 / .08); }
 .measure-ctl { display: flex; align-items: center; gap: .5rem; font: 600 .9rem "Barlow", system-ui, sans-serif; }
 .measure-ctl select {
   font: inherit; color: var(--ink); background: transparent;
@@ -188,7 +196,7 @@ th + th, td + td { border-left: 1px solid var(--rule); }
 th.num, td.num { text-align: right; }
 td.name { cursor: default; }
 thead th {
-  position: sticky; top: 0;
+  position: sticky; top: var(--bar-h, 0px);
   background: var(--paper);
   border-bottom: 1.5px solid var(--line);
   padding-top: .6rem;
@@ -249,10 +257,6 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
 .total-sub { margin-top: .2rem; font-size: .8rem; font-weight: 400; line-height: 1.1; color: var(--muted); }
 .split-sorts { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .table-section .split-sorts button.sort-btn { width: auto; }
-/* Once the picker would wrap under the measure text, put it above instead */
-@media (max-width: 1000px) {
-  header .controls { order: -1; margin-left: 0; }
-}
 @media (max-width: 760px) {
   .stages { grid-template-columns: 1fr; height: auto; }
   .stage { min-height: 65vh; }
@@ -270,6 +274,7 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
   .split-sorts { gap: .4rem; }
   .controls { margin-left: 0; width: 100%; }
   .measure-ctl { width: 100%; }
+  .measure-bar { padding-top: .4rem; padding-bottom: .4rem; }
   .measure-ctl select { flex: 1; min-width: 0; max-width: none; }
   .vote-means { grid-template-columns: 1fr; gap: .5rem; }
 }
