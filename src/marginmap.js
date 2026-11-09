@@ -15,7 +15,43 @@ import { alignTo, easeInOut, resample } from "./shapes.js";
 
 const SIDE_NAME = { yes: "Yes", no: "No" };
 const RING_PTS = 96;      // points each outline is resampled to for the pie morph
+const CLUSTER_GAP = 5;    // px between counties when grouped by winner
+const labelPoints = new Map(); // county id -> label point relative to its home, at scale 1
+const LABEL_MIN_H = 18;   // a county label needs a shape at least this tall (12px text plus halo)
+const LABEL_PAD_X = 8;    // and this much width beyond the text
 const clamp01 = x => Math.max(0, Math.min(1, x));
+
+// Distance from a point to a ring's outline, negative when the point is outside the ring
+function edgeDistance(ring, x, y) {
+  let best = Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[j], [bx, by] = ring[i];
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2));
+    best = Math.min(best, Math.hypot(ax + t * dx - x, ay + t * dy - y));
+  }
+  return d3.polygonContains(ring, [x, y]) ? best : -best;
+}
+
+// Label point: sample the ring's box on an even grid of about 600 square cells, keep the
+// points with at least 60% of the most room to the edges, and take the one nearest the
+// centroid. Long strips (Arapahoe, Rio Blanco) get a centred label instead of one at an end,
+// and Denver's label stays in its main square because the airport strip is too narrow to qualify.
+function interiorPoint(ring) {
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+  const x0 = d3.min(xs), x1 = d3.max(xs), y0 = d3.min(ys), y1 = d3.max(ys);
+  const step = Math.sqrt(((x1 - x0) * (y1 - y0)) / 600) || 1;
+  const [cx, cy] = d3.polygonCentroid(ring);
+  const pts = [];
+  for (let x = x0 + step / 2; x < x1; x += step) for (let y = y0 + step / 2; y < y1; y += step) {
+    const d = edgeDistance(ring, x, y);
+    if (d > 0) pts.push([x, y, d]);
+  }
+  if (!pts.length) return [cx, cy];
+  const minD = 0.6 * d3.max(pts, p => p[2]);
+  const best = d3.least(pts.filter(p => p[2] >= minD), p => (p[0] - cx) ** 2 + (p[1] - cy) ** 2);
+  return [best[0], best[1]];
+}
 
 export function createMarginMap(sectionEl) {
   const stage = sectionEl.querySelector(".stage");
@@ -52,19 +88,82 @@ export function createMarginMap(sectionEl) {
     return { sized, pos: laid.pos, overlaps: laid.overlaps };
   }
 
-  // Stage 2: yes-won counties packed into the left region, no-won into the right, same sizes.
-  // Each county's home is its margin-view position squeezed into its region.
+  // Arrange a group of hulls as a compact block in the middle of a w x h region: split them into
+  // rows (top to bottom by their margin-view y, then left to right by x, so the move stays
+  // coherent) and choose the row count whose block best matches the region's shape.
+  // Returns a starting point (hull anchor) per county.
+  function packStart(group, pos, w, h, gap) {
+    const boxes = group.map(d => {
+      const xs = d.hull.map(p => p[0]), ys = d.hull.map(p => p[1]);
+      return { d, x0: d3.min(xs), x1: d3.max(xs), y0: d3.min(ys), y1: d3.max(ys), p: pos.get(d.c.id) };
+    });
+    boxes.forEach(b => { b.w = b.x1 - b.x0; b.h = b.y1 - b.y0; });
+    const byY = boxes.slice().sort((a, b) => a.p.y - b.p.y);
+    const totalW = d3.sum(boxes, b => b.w);
+    const rowsFor = r => { // greedy split in y order into rows of about equal total width
+      const rows = [[]];
+      let acc = 0;
+      for (const b of byY) {
+        if (acc >= (totalW * rows.length) / r && rows.length < r) rows.push([]);
+        rows[rows.length - 1].push(b);
+        acc += b.w;
+      }
+      return rows;
+    };
+    let best = null;
+    for (let r = 1; r <= boxes.length; r++) {
+      const rows = rowsFor(r);
+      const rowW = d3.max(rows, row => d3.sum(row, b => b.w));
+      const sumH = d3.sum(rows, row => d3.max(row, b => b.h));
+      const cost = Math.max(rowW / w, sumH / h);
+      if (!best || cost < best.cost) best = { cost, rows };
+    }
+    // Rows sit `gap` apart, each row centred, the whole block centred in the region
+    const homes = new Map();
+    const rows = best.rows, heights = rows.map(row => d3.max(row, b => b.h));
+    let y = (h - d3.sum(heights) - gap * (rows.length - 1)) / 2;
+    rows.forEach((row, i) => {
+      row.sort((a, b) => a.p.x - b.p.x);
+      let x = (w - d3.sum(row, b => b.w) - gap * (row.length - 1)) / 2;
+      for (const b of row) {
+        homes.set(b.d.c.id, { x: x - b.x0, y: y + heights[i] / 2 - (b.y0 + b.y1) / 2 });
+        x += b.w + gap;
+      }
+      y += heights[i] + gap;
+    });
+    return homes;
+  }
+
+  // Stage 2: yes-won counties clustered in the middle of the left region, no-won in the right,
+  // same sizes. They start as a block of rows, then are pulled toward the region's centre while
+  // the overlap pass keeps them a few pixels apart, which closes the gaps between outlines.
   function sideLayout(sized, pos, xDiv) {
     const out = new Map();
     let bad = 0;
     for (const [side, x0, w] of [[1, 0, xDiv], [-1, xDiv, W - xDiv]]) {
       const group = sized.filter(d => Math.sign(d.diff) === side);
       if (!group.length) continue;
-      const laid = layoutHulls(group.map(d => ({ id: d.c.id, hull: d.hull, home: { x: (pos.get(d.c.id).x / W) * w, y: pos.get(d.c.id).y } })), w, H);
+      const starts = packStart(group, pos, w, H, CLUSTER_GAP);
+      const centre = { x: w / 2, y: H / 2 };
+      const laid = layoutHulls(group.map(d => ({ id: d.c.id, hull: d.hull, start: starts.get(d.c.id), home: centre })), w, H,
+        { pad: CLUSTER_GAP, stages: 1, perStage: 40, pull: 0.05, settle: 300 });
       bad += laid.overlaps;
       for (const [id, p] of laid.pos) out.set(id, { x: x0 + p.x, y: p.y });
     }
     return { pos: out, overlaps: bad };
+  }
+
+  // County label for a shape whose bounding box is w x h px (12px font already set on ctx):
+  // the full name if it fits, else nothing
+  const textWidths = new Map();
+  const textWidth = t => {
+    if (document.fonts.status !== "loaded") return ctx.measureText(t).width; // don't cache fallback-font widths
+    if (!textWidths.has(t)) textWidths.set(t, ctx.measureText(t).width);
+    return textWidths.get(t);
+  };
+  function labelFor(it, w, h) {
+    if (h < LABEL_MIN_H) return null;
+    return textWidth(it.name) + LABEL_PAD_X <= w ? it.name : null;
   }
 
   function sector(cx, cy, R, a0, a1) {
@@ -139,7 +238,9 @@ export function createMarginMap(sectionEl) {
       const xs = d.rings.flat().map(p => p[0]), ys = d.rings.flat().map(p => p[1]);
       const mainIdx = d.rings.reduce((best, ring, j) => Math.abs(d3.polygonArea(ring)) > Math.abs(d3.polygonArea(d.rings[best])) ? j : best, 0);
       const main = d.rings[mainIdx];
-      const [lx, ly] = d3.polygonCentroid(main);
+      // The label point only depends on the outline's shape, so find it once per county at scale 1
+      if (!labelPoints.has(d.c.id)) labelPoints.set(d.c.id, interiorPoint(resample(main.map(([x, y]) => [x / d.s, y / d.s]), 200)));
+      const [lx, ly] = labelPoints.get(d.c.id).map(v => v * d.s);
       // Pie morph: the main ring (as placed in stage 2) travels to its slice; islands shrink away
       const ringAbs = resample(main, RING_PTS).map(([x, y]) => [x + end2.x, y + end2.y]);
       const slice = alignTo(ringAbs, resample(slices.get(d.c.id), RING_PTS));
@@ -434,12 +535,13 @@ export function createMarginMap(sectionEl) {
       ctx.font = '600 12px "Barlow", system-ui, sans-serif';
       for (const it of items) {
         const g = place(it, P);
-        if (Math.min(g.box.x1 - g.box.x0, g.box.y1 - g.box.y0) < CONFIG.minLabelPx) continue;
+        const text = labelFor(it, g.box.x1 - g.box.x0, g.box.y1 - g.box.y0);
+        if (!text) continue;
         ctx.lineWidth = 3;
         ctx.strokeStyle = colors.paper;
-        ctx.strokeText(it.name, g.label.x, g.label.y);
+        ctx.strokeText(text, g.label.x, g.label.y);
         ctx.fillStyle = colors.ink;
-        ctx.fillText(it.name, g.label.x, g.label.y);
+        ctx.fillText(text, g.label.x, g.label.y);
       }
     }
 

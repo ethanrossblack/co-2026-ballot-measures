@@ -3,9 +3,10 @@
 // their map positions and are relaxed: overlapping or too-close pairs are pushed apart (the
 // smaller county yields more), while a weak pull keeps everything near its map position.
 
-// items: [{ id, hull: [[x, y]] relative to the county's anchor, home: {x, y} }]
+// items: [{ id, hull: [[x, y]] relative to the county's anchor, home: {x, y}, start?: {x, y} }]
+// (start defaults to home; pull is the per-step fraction of the way home during the growth stages)
 // Returns { pos: Map id -> {x, y} (anchor position), overlaps: pairs still too close }
-export function layoutHulls(items, W, H, { pad = 4, margin = 6, stages = 8, perStage = 40, settle = 800 } = {}) {
+export function layoutHulls(items, W, H, { pad = 4, margin = 6, stages = 8, perStage = 40, settle = 800, pull = 0.03 } = {}) {
   let g = 1; // current growth factor: hulls grow from small to full size so the layout evolves smoothly
   const nodes = items.map(it => {
     const hull = it.hull;
@@ -15,7 +16,7 @@ export function layoutHulls(items, W, H, { pad = 4, margin = 6, stages = 8, perS
       return [dy / len, -dx / len];
     });
     return {
-      id: it.id, hull, normals, home: it.home, x: it.home.x, y: it.home.y,
+      id: it.id, hull, normals, home: it.home, x: (it.start ?? it.home).x, y: (it.start ?? it.home).y,
       minX: Math.min(...hull.map(p => p[0])), maxX: Math.max(...hull.map(p => p[0])),
       minY: Math.min(...hull.map(p => p[1])), maxY: Math.max(...hull.map(p => p[1])),
       area: Math.abs(d3.polygonArea(hull)) || 1
@@ -73,7 +74,7 @@ export function layoutHulls(items, W, H, { pad = 4, margin = 6, stages = 8, perS
 
   for (let st = 1; st <= stages; st++) {
     g = 0.25 + (0.75 * st) / stages;
-    for (let it = 0; it < perStage; it++) step(0.03);
+    for (let it = 0; it < perStage; it++) step(pull);
   }
   let overlaps = 0;
   for (let it = 0; it < settle; it++) { overlaps = step(0); if (!overlaps) break; }
