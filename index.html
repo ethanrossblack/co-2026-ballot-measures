@@ -41,7 +41,13 @@
       <span class="legend"><span class="swatch yes"></span>Yes won<span class="swatch no"></span>No won</span>
       <span class="mm-total"></span>
     </div>
-    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow. Use the steps above the map to move between the real map, the margin map, the counties grouped by winner (split at the statewide vote ratio) and a Yes/No pie chart.</p>
+    <p class="margin-note">A regular map makes large, sparsely populated counties look important. This one sizes each county by its winning margin instead: the number of extra votes the winning side got there. Counties that were close or have few voters shrink; populous counties won by a wide margin grow large. Green counties voted Yes, red counties voted No. Use the tabs on top of the map to switch between four views:</p>
+    <ul class="margin-views">
+      <li><strong>Real map:</strong> Colorado as you know it, each county colored by the side that won it.</li>
+      <li><strong>Margin map:</strong> the same counties resized by their winning margin, kept near their real locations.</li>
+      <li><strong>By winner:</strong> counties sorted to a Yes side and a No side, split by each side’s share of the statewide vote. Each side lists how many counties it won and their combined margin; the difference between the two totals is the statewide margin.</li>
+      <li><strong>Pie chart:</strong> the counties melt into the statewide result, the Yes and No shares of every vote cast.</li>
+    </ul>
     <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
     <!-- Stage picker, attached to the top edge of the map; arrow keys move between steps -->
     <div class="mm-steps" role="group" aria-label="Margin map view">

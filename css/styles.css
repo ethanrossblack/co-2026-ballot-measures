@@ -170,6 +170,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: 
 .statewide { max-width: 58rem; margin: 0 0 .75rem; }
 .statewide-cap { display: block; margin-bottom: .2rem; color: var(--muted); font-size: .9rem; }
 .margin-note { margin: .3rem 0 .6rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+.margin-views { margin: 0 0 .9rem; padding-left: 1.2rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+.margin-views li + li { margin-top: .2rem; }
+.margin-views strong { color: var(--ink); font-weight: 600; }
 .margin-section .stage { flex: none; height: max(420px, 75vh); }
 /* Heading, search/sort bar and table share one column, centered once the window is wider than it */
 .table-section {
