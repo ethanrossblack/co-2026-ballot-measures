@@ -265,6 +265,23 @@ const server = http.createServer((req, res) => {
   }
   ok('table is centered at 1100-1900px wide', centered);
 
+  // ---- Margin map step control ---------------------------------------------------------
+  const pressed = () => page.$$eval('.mm-steps button', bs => bs.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.step));
+  ok('margin map starts on the real map step', JSON.stringify(await pressed()) === '["0"]');
+  await page.click('.mm-steps [data-step="2"]');
+  ok('clicking a step selects it (jumping past the margin map)', JSON.stringify(await pressed()) === '["2"]');
+  await page.keyboard.press('ArrowRight');
+  const focusedStep = () => page.evaluate(() => document.activeElement?.dataset?.step);
+  ok('ArrowRight moves to the next step and focus', JSON.stringify(await pressed()) === '["3"]' && (await focusedStep()) === '3');
+  await page.keyboard.press('ArrowRight'); // already last: stays
+  await page.keyboard.press('Home');
+  ok('Home returns to the real map', JSON.stringify(await pressed()) === '["0"]' && (await focusedStep()) === '0');
+  ok('step control sits directly on top of the map frame', await page.evaluate(() => {
+    const a = document.querySelector('.mm-steps').getBoundingClientRect(), b = document.querySelector('.margin-section .stage').getBoundingClientRect();
+    return Math.abs(a.bottom - b.top) < 1;
+  }));
+  await page.waitForTimeout(2500); // let the glide back finish
+
   // ---- Sticky measure bar -----------------------------------------------------------
   for (const w of [1280, 375]) {
     await page.setViewportSize({ width: w, height: 800 });

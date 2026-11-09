@@ -32,6 +32,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+html { scroll-padding-top: var(--bar-h, 0px); } /* scrolled-to elements land below the sticky picker */
 body {
   min-height: 100vh;
   display: flex;
@@ -147,8 +148,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: 
 .margin-head .swatch.yes { background: var(--yes); }
 .margin-head .swatch.no { background: var(--no); }
 .mm-total { color: var(--muted); font-variant-numeric: tabular-nums; }
-.mm-buttons { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5rem; }
-.mm-buttons [hidden] { display: none; }
+/* Stage picker: a segmented control sitting on the map's top edge, like tabs on a card */
+.mm-steps {
+  display: flex; width: fit-content; max-width: 100%;
+  margin: .25rem 0 0 .75rem;
+  border: 1.5px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+.mm-steps button {
+  flex: 1 1 auto;
+  border: none; border-radius: 0;
+  padding: .45rem .95rem;
+  line-height: 1.15;
+}
+.mm-steps button + button { border-left: 1.5px solid var(--line); }
+.mm-steps button[aria-pressed="true"] { background: var(--line); color: var(--paper); }
+.mm-steps button:focus-visible { outline: 2px solid var(--line); outline-offset: -4px; }
+.mm-steps button[aria-pressed="true"]:focus-visible { outline-color: var(--paper); }
+/* The map frame's top-left corner meets the tabs square */
+.mm-steps + .stage { border-top-left-radius: 0; }
 .statewide { max-width: 58rem; margin: 0 0 .75rem; }
 .statewide-cap { display: block; margin-bottom: .2rem; color: var(--muted); font-size: .9rem; }
 .margin-note { margin: .3rem 0 .6rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
@@ -275,6 +293,10 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
   .controls { margin-left: 0; width: 100%; }
   .measure-ctl { width: 100%; }
   .measure-bar { padding-top: .4rem; padding-bottom: .4rem; }
+  /* Phones: the steps span the map's full width, and the frame's top corners meet them square */
+  .mm-steps { width: auto; margin-left: 0; }
+  .mm-steps button { flex: 1 1 0; padding: .45rem .3rem; font-size: .82rem; }
+  .mm-steps + .stage { border-top-right-radius: 0; }
   .measure-ctl select { flex: 1; min-width: 0; max-width: none; }
   .vote-means { grid-template-columns: 1fr; gap: .5rem; }
 }

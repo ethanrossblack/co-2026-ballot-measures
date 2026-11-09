@@ -56,9 +56,8 @@ function interiorPoint(ring) {
 export function createMarginMap(sectionEl) {
   const stage = sectionEl.querySelector(".stage");
   const canvas = stage.querySelector("canvas");
-  const toggleBtn = sectionEl.querySelector(".mm-toggle");
-  const prevBtn = sectionEl.querySelector(".mm-prev");
-  const nextBtn = sectionEl.querySelector(".mm-next");
+  const stepsEl = sectionEl.querySelector(".mm-steps");
+  const stepBtns = [...stepsEl.querySelectorAll("button[data-step]")];
   const totalEl = sectionEl.querySelector(".mm-total");
   const ctx = canvas.getContext("2d");
   let W = 0, H = 0, dpr = 1, mapM = 1;
@@ -298,7 +297,8 @@ export function createMarginMap(sectionEl) {
     restart();
   }
 
-  // Glide the stage progress to `to` (always an adjacent stage), from wherever it is now
+  // Glide the stage progress to `to` from wherever it is now. P is one continuous value, so a
+  // jump of several stages plays the stages in between on the way; the duration scales with it.
   function go(to) {
     const now = performance.now();
     const from = progress(Math.max(now, anim.t0));
@@ -306,20 +306,24 @@ export function createMarginMap(sectionEl) {
     syncButtons();
   }
 
+  // The step control shows the stage being shown (or animated to) as pressed
   function syncButtons() {
-    const t = anim.to;
-    toggleBtn.hidden = t > 1;
-    toggleBtn.textContent = t === 1 ? "Show physical map" : "Show margin map";
-    toggleBtn.title = t === 1 ? "Animate back to the real shape and position of every county" : "Animate each county to its margin area, spaced so none touch";
-    nextBtn.hidden = t === 0 || t === 3;
-    nextBtn.textContent = t === 1 ? "Group by winner" : "Combine into pie chart";
-    nextBtn.title = t === 1 ? "Move each county to its side, split at the statewide vote ratio" : "Fold the counties on each side into one pie chart";
-    prevBtn.hidden = t < 2;
-    prevBtn.textContent = t === 2 ? "Back to margin map" : "Split into counties";
+    for (const b of stepBtns) b.setAttribute("aria-pressed", String(Number(b.dataset.step) === anim.to));
   }
-  toggleBtn.addEventListener("click", () => go(anim.to === 1 ? 0 : 1));
-  nextBtn.addEventListener("click", () => go(Math.min(3, anim.to + 1)));
-  prevBtn.addEventListener("click", () => go(Math.max(1, anim.to - 1)));
+  stepsEl.addEventListener("click", e => {
+    const b = e.target.closest("button[data-step]");
+    if (b && Number(b.dataset.step) !== anim.to) go(Number(b.dataset.step));
+  });
+  // Left/Right (and Home/End) step through the stages and move focus with them
+  stepsEl.addEventListener("keydown", e => {
+    const i = stepBtns.indexOf(document.activeElement);
+    if (i < 0) return;
+    const j = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: stepBtns.length - 1 }[e.key];
+    if (j === undefined || j < 0 || j >= stepBtns.length) return;
+    e.preventDefault();
+    stepBtns[j].focus();
+    if (j !== anim.to) go(j);
+  });
 
   // Where a county is at stage progress P <= 2: anchor position, draw scale, and the pixel
   // bounding box and label point derived from them

@@ -40,14 +40,16 @@
       <h2 id="margin-title">Margin map</h2>
       <span class="legend"><span class="swatch yes"></span>Yes won<span class="swatch no"></span>No won</span>
       <span class="mm-total"></span>
-      <span class="mm-buttons">
-        <button class="mm-toggle" type="button">Show physical map</button>
-        <button class="mm-prev" type="button" hidden>Back</button>
-        <button class="mm-next" type="button">Group by winner</button>
-      </span>
     </div>
-    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow. “Group by winner” moves each county to its side, split at the statewide vote ratio, and then folds them into a Yes/No pie chart.</p>
+    <p class="margin-note">Colorado again, but each county’s area is proportional to its vote margin (the gap between Yes and No), colored for the side that won it. Counties with a close result shrink; lopsided ones grow. Use the steps above the map to move between the real map, the margin map, the counties grouped by winner (split at the statewide vote ratio) and a Yes/No pie chart.</p>
     <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
+    <!-- Stage picker, attached to the top edge of the map; arrow keys move between steps -->
+    <div class="mm-steps" role="group" aria-label="Margin map view">
+      <button type="button" data-step="0" aria-pressed="true" title="The real shape and position of every county">Real map</button>
+      <button type="button" data-step="1" aria-pressed="false" title="Each county sized by its vote margin, spaced so none touch">Margin map</button>
+      <button type="button" data-step="2" aria-pressed="false" title="Each county moved to the side that won it, split at the statewide vote ratio">By winner</button>
+      <button type="button" data-step="3" aria-pressed="false" title="The counties on each side folded into one pie chart">Pie chart</button>
+    </div>
     <div class="stage"><canvas aria-label="Vote margin by county"></canvas></div>
   </section>
   <div id="sides-mount"></div>
