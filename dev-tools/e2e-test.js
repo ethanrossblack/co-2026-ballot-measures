@@ -85,8 +85,8 @@ const server = http.createServer((req, res) => {
     await clearTexts();
     return t;
   };
-  const names = () => page.$$eval('#results-table tbody td.name', t => t.map(x => x.textContent));
-  const rows = () => page.$$eval('#results-table tbody tr[data-id]', trs => trs.map(r => {
+  const names = () => page.$$eval('#results-table .county-body td.name', t => t.map(x => x.textContent));
+  const rows = () => page.$$eval('#results-table .county-body tr[data-id]', trs => trs.map(r => {
     const title = r.querySelector('.split-wrap').title;
     const m = title.match(/Yes ([\d,]+) \(.*No ([\d,]+) \(/);
     const yes = +m[1].replace(/,/g, ''), no = +m[2].replace(/,/g, '');
@@ -144,7 +144,7 @@ const server = http.createServer((req, res) => {
   ok('64 county rows', d.length === 64, `got ${d.length}`);
   ok('starts sorted A to Z', JSON.stringify(await names()) === JSON.stringify([...(await names())].sort((a, b) => a.localeCompare(b))) && d[0].name === 'Adams');
   ok('bar segments sum to 100%', d.every(r => Math.abs(r.yesW + r.noW - 100) < 1e-6));
-  const pctLabelsOK = await page.$$eval('#results-table tbody tr', trs => trs.every(r => {
+  const pctLabelsOK = await page.$$eval('#results-table .county-body tr', trs => trs.every(r => {
     const w = parseFloat(r.querySelector('.seg.yes').style.width);
     return r.querySelector('.seg.yes .lab').textContent === w.toFixed(1) + '%';
   }));
@@ -162,14 +162,16 @@ const server = http.createServer((req, res) => {
     const share = r.total / stateTotal;
     return r.totalMain === nf(r.total) && r.totalSub === (share * 100).toFixed(share < 0.01 ? 2 : 1) + '%';
   }));
-  const foot = await page.$eval('#results-table tfoot tr', r => [r.children[0].textContent, r.querySelector('.margin-main').textContent, r.querySelector('.margin-sub').textContent, r.querySelector('.total-main').textContent, r.querySelector('.total-sub').textContent]);
+  const foot = await page.$eval('#results-table .statewide-body tr', r => [r.children[0].textContent, r.querySelector('.margin-main').textContent, r.querySelector('.margin-sub').textContent, r.querySelector('.total-main').textContent, r.querySelector('.total-sub').textContent]);
   const diff = stateYes - stateNo, pts = Math.abs(diff) / stateTotal * 100;
   const footExpected = [`+${pts.toFixed(1)} ${diff > 0 ? 'Yes' : 'No'}`, nf(Math.abs(diff)), nf(stateTotal), '100.0%'];
-  ok('Statewide footer row', foot.join('|') === ['Statewide', ...footExpected].join('|'), foot.join('|'));
+  ok('Statewide row', foot.join('|') === ['Statewide', ...footExpected].join('|'), foot.join('|'));
+  ok('Statewide row is the first row under the header',
+    await page.$eval('#results-table', t => t.querySelector('thead + tbody tr td')?.textContent === 'Statewide' && !t.querySelector('tfoot')));
 
   // ---- Hover: table row -> canvases -------------------------------------------------
   await clearTexts();
-  const adams = page.locator('#results-table tbody tr', { has: page.locator('td.name', { hasText: /^Adams$/ }) });
+  const adams = page.locator('#results-table .county-body tr', { has: page.locator('td.name', { hasText: /^Adams$/ }) });
   const A = M.counties.Adams;
   for (const [what, sel] of [['name', 'td.name'], ['bar', 'td.split-cell'], ['margin', 'td.margin-cell'], ['total', 'td.total-cell']]) {
     await adams.locator(sel).hover();
@@ -179,7 +181,7 @@ const server = http.createServer((req, res) => {
       id === '08001' && labels.includes(`Adams County: ${nf(A.yes)} yes votes (${(A.yes / (A.yes + A.no) * 100).toFixed(1)}% of county)`) && labels.includes(`Adams County: ${nf(A.no)} no votes (${(A.no / (A.yes + A.no) * 100).toFixed(1)}% of county)`),
       `id=${id} labels=${JSON.stringify(labels)}`);
   }
-  await page.locator('#results-table tfoot tr td').first().hover();
+  await page.locator('#results-table .statewide-body tr td').first().hover();
   await page.waitForTimeout(200); await clearTexts();
   ok('Statewide row does not highlight anything', (await stateOf('tableHoverId')) === null && (await countyLabels()).length === 0);
 
@@ -202,7 +204,7 @@ const server = http.createServer((req, res) => {
   await page.waitForTimeout(300);
   const oy = Object.values(other.counties).reduce((a, c) => a + c.yes, 0);
   const on = Object.values(other.counties).reduce((a, c) => a + c.no, 0);
-  const ofoot = await page.$eval('#results-table tfoot tr', r => r.querySelector('.total-main').textContent);
+  const ofoot = await page.$eval('#results-table .statewide-body tr', r => r.querySelector('.total-main').textContent);
   ok('picking another measure updates title and statewide total',
     (await page.$eval('#title', e => e.textContent)) === other.name && ofoot === nf(oy + on), `${other.name} ${ofoot}`);
   ok('picking a measure updates the URL', new URL(page.url()).searchParams.get('measure') === other.key);
@@ -285,7 +287,7 @@ const server = http.createServer((req, res) => {
   // ---- Sticky measure bar -----------------------------------------------------------
   for (const w of [1280, 375]) {
     await page.setViewportSize({ width: w, height: 800 });
-    await page.evaluate(() => document.querySelector('#results-table tbody tr:nth-child(20)').scrollIntoView());
+    await page.evaluate(() => document.querySelector('#results-table .county-body tr:nth-child(20)').scrollIntoView());
     await page.waitForTimeout(250);
     const g = await page.evaluate(() => {
       const bar = document.querySelector('.measure-bar').getBoundingClientRect();

@@ -175,7 +175,7 @@ function renderTable() {
     tr.append(cell);
     body.push(tr);
   }
-  document.querySelector("#results-table tbody").replaceChildren(...body);
+  document.querySelector("#results-table .county-body").replaceChildren(...body);
   document.getElementById("table-count").textContent = tableQuery
     ? `${rows.length} of ${tableRows.length} counties`
     : `${tableRows.length} counties`;
@@ -211,7 +211,7 @@ export function setTableData(res) {
   const tr = document.createElement("tr");
   tr.append(td("Statewide"), tdBar("Statewide", res.totals.yes, res.totals.no),
     tdMargin(res.totals.yes, res.totals.no), tdTotal(grand, grand ? 1 : 0));
-  document.querySelector("#results-table tfoot").replaceChildren(tr);
+  document.querySelector("#results-table .statewide-body").replaceChildren(tr);
   renderTable();
 }
 
@@ -242,7 +242,7 @@ document.getElementById("county-search").addEventListener("input", e => {
 document.fonts?.ready.then(fitSegLabels);
 
 // Hovering anywhere on a county's row highlights that county in both containers
-const tbody = document.querySelector("#results-table tbody");
+const tbody = document.querySelector("#results-table .county-body");
 tbody.addEventListener("mouseover", e => {
   const row = e.target.closest("tr[data-id]");
   state.tableHoverId = row ? row.dataset.id : null;

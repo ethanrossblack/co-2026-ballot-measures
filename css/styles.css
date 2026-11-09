@@ -219,8 +219,9 @@ thead th {
   border-bottom: 1.5px solid var(--line);
   padding-top: .6rem;
 }
-tbody tr:hover { background: var(--hover-bg); }
-tfoot td { font-weight: 600; border-top: 1.5px solid var(--line); border-bottom: none; }
+.county-body tr:hover { background: var(--hover-bg); }
+/* Statewide totals sit above the county rows, whatever the sort */
+.statewide-body td { font-weight: 600; border-bottom: 1.5px solid var(--line); }
 .table-section button.sort-btn {
   display: flex; align-items: center; gap: .4rem; width: 100%;
   padding: 0; border: 0; border-radius: 0; background: none;
