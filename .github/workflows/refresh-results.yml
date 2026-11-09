@@ -1,0 +1,48 @@
+# Pulls the latest Secretary of State results and commits them when they change.
+# Runs hourly, and on demand from the Actions tab ("Run workflow").
+name: Refresh election results
+
+on:
+  schedule:
+    - cron: "17 * * * *" # every hour at :17 UTC; GitHub may start scheduled runs a few minutes late
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if the snapshot hasn't changed"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-results
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download results and rebuild data
+        run: node scripts/fetch-results.mjs ${{ inputs.force && '--force' || '' }}
+
+      - name: Commit and push if the data changed
+        run: |
+          if git diff --quiet -- data/; then
+            echo "No new results."
+            exit 0
+          fi
+          stamp=$(sed -n 's/.*<Timestamp>\(.*\)<\/Timestamp>.*/\1/p' data/all_co_results.xml | head -n 1)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/all_co_results.xml data/ballot-measures.js
+          git commit -m "Refresh election results (snapshot ${stamp})"
+          git pull --rebase
+          git push
