@@ -221,9 +221,12 @@ export function createMarginMap(sectionEl) {
     const cx = W / 2, cy = H / 2, R = 0.4 * Math.min(W, H);
     const span = { yes: 2 * Math.PI * share, no: 2 * Math.PI * (1 - share) };
     const start = { no: -Math.PI / 2, yes: -Math.PI / 2 + span.no }; // No runs clockwise from straight up, Yes fills the rest, so one edge is a vertical line
-    split = { x: xDiv, share, pie: { cx, cy, R, wedge: { yes: [start.yes, start.yes + span.yes], no: [start.no, start.no + span.no] } } };
-    const cursor = { ...start };
     const total = { yes: sideSum(1), no: sideSum(-1) };
+    // Counties each side won and their margins added up (the two totals differ by the statewide margin)
+    const groups = Object.fromEntries([["yes", 1], ["no", -1]].map(([side, s]) =>
+      [side, { n: rows.filter(d => Math.sign(d.diff) === s).length, margin: total[side] }]));
+    split = { x: xDiv, share, groups, pie: { cx, cy, R, wedge: { yes: [start.yes, start.yes + span.yes], no: [start.no, start.no + span.no] } } };
+    const cursor = { ...start };
     const byMargin = out.sized.slice().sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
     const slices = new Map();
     for (const d of byMargin) {
@@ -423,18 +426,34 @@ export function createMarginMap(sectionEl) {
     if (P <= 1 || !items.length) return;
     ctx.save();
     ctx.globalAlpha = clamp01(P - 1) * (1 - clamp01((P - 2) * 2)); // hand over to the wedge labels
-    ctx.font = '600 14px "Barlow", system-ui, sans-serif';
     ctx.textBaseline = "top";
     ctx.lineWidth = 4;
     ctx.strokeStyle = colors.paper;
-    for (const [text, x, align] of [
-      [`Yes ${pct(split.share)} · ${fmt(res.totals.yes)} votes`, 12, "left"],
-      [`No ${pct(1 - split.share)} · ${fmt(res.totals.no)} votes`, W - 12, "right"]
-    ]) {
+    ctx.fillStyle = colors.ink;
+    const counties = n => `${n} ${n === 1 ? "county" : "counties"}`;
+    const BIG = "600 14px", SMALL = "400 12px";
+    // Per side: the vote split, then the counties grouped on that side with their margins summed.
+    // Two lines when both sides fit next to each other, else four shorter ones (phones).
+    const lines = (side, wide) => {
+      const g = split.groups[side], share = side === "yes" ? split.share : 1 - split.share;
+      const head = `${SIDE_NAME[side]} ${pct(share)}`, votes = `${fmt(res.totals[side])} votes`;
+      if (!g.n) return wide ? [[`${head} · ${votes}`, BIG], ["No counties won", SMALL]] : [[head, BIG], [votes, SMALL], ["No counties won", SMALL]];
+      return wide
+        ? [[`${head} · ${votes}`, BIG], [`${counties(g.n)} · combined margin ${fmt(g.margin)}`, SMALL]]
+        : [[head, BIG], [votes, SMALL], [counties(g.n), SMALL], [`margin ${fmt(g.margin)}`, SMALL]];
+    };
+    const width = ([text, font]) => { ctx.font = `${font} "Barlow", system-ui, sans-serif`; return ctx.measureText(text).width; };
+    const [wy, wn] = [lines("yes", true), lines("no", true)];
+    const wide = wy.every((l, i) => width(l) + width(wn[i]) + 16 <= W - 24);
+    for (const [side, x, align] of [["yes", 12, "left"], ["no", W - 12, "right"]]) {
       ctx.textAlign = align;
-      ctx.strokeText(text, x, 10);
-      ctx.fillStyle = colors.ink;
-      ctx.fillText(text, x, 10);
+      let y = 10;
+      for (const [text, font] of lines(side, wide)) {
+        ctx.font = `${font} "Barlow", system-ui, sans-serif`;
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+        y += font === BIG ? 19 : 16;
+      }
     }
     ctx.restore();
   }
