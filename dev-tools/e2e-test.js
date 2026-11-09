@@ -112,7 +112,30 @@ const server = http.createServer((req, res) => {
   ok('picker lists all 14 statewide measures', opts.length === 14 && opts.length === DATA.measures.length, `got ${opts.length}`);
   ok('picker has no judicial or candidate contests', opts.every(([, t]) => /^(Amendment|Proposition) /.test(t)), JSON.stringify(opts));
   ok('?measure= deep link selects that measure', (await page.$eval('#measure', e => e.value)) === MEASURE_KEY);
-  ok('title shows the measure', (await page.$eval('#title', e => e.textContent)) === M.title);
+  ok('title shows the measure', (await page.$eval('#title', e => e.textContent)) === M.name);
+  ok('picker options carry the Blue Book short name', opts.some(([k, t]) => k === MEASURE_KEY && t === `${M.name}: ${M.shortTitle}`));
+
+  // ---- Measure header (Blue Book text) ----------------------------------------------
+  const head = await page.evaluate(() => {
+    const t = id => document.getElementById(id).textContent;
+    return {
+      name: t('measure-name'), meta: t('measure-meta'), chip: t('pass-chip'), chipHidden: document.getElementById('pass-chip').hidden,
+      passText: t('pass-text'), yes: t('means-yes'), no: t('means-no'), ballot: t('ballot-title-text'),
+      ballotOpen: document.getElementById('ballot-title').open, source: document.querySelector('#measure-source a')?.href,
+      lines: [...document.querySelectorAll('.statewide .pass-line')].map(l => l.style.left),
+      caps: [...document.querySelectorAll('.statewide-cap')].map(c => c.textContent)
+    };
+  });
+  const yesShare = stateYes / (stateYes + stateNo);
+  const passing = M.passShare > 0.5 ? yesShare >= M.passShare : yesShare > 0.5;
+  ok('header shows short name and type line', head.name === M.shortTitle &&
+    head.meta === `Constitutional amendment · Citizen initiative · Needs ${M.passShare > 0.5 ? 'at least 55%' : 'a majority'} to pass`, JSON.stringify([head.name, head.meta]));
+  ok('pass status matches the statewide share', !head.chipHidden && head.chip === (passing ? 'Passing' : 'Failing') &&
+    head.passText.includes(`${(yesShare * 100).toFixed(1)}%`), `${head.chip} ${head.passText}`);
+  ok('Yes/No meanings and ballot title shown', head.yes === M.yes && head.no === M.no && head.ballot === M.ballotTitle && !head.ballotOpen);
+  ok('source links to the Blue Book page', head.source === `${DATA.source.url}#page=${M.page}`, head.source);
+  ok('pass line drawn on both statewide bars', head.lines.length === 2 && head.lines.every(l => l === `${Math.round(M.passShare * 100)}%`) &&
+    head.caps.every(c => c.includes(`${Math.round(M.passShare * 100)}%`)), JSON.stringify([head.lines, head.caps]));
   ok('snapshot note shows reporting progress',
     (await page.$eval('#snapshot-note', e => e.textContent)).includes(`${M.precinctsReportingPercent}% of precincts reporting`));
 
@@ -181,11 +204,17 @@ const server = http.createServer((req, res) => {
   const on = Object.values(other.counties).reduce((a, c) => a + c.no, 0);
   const ofoot = await page.$eval('#results-table tfoot tr', r => r.querySelector('.total-main').textContent);
   ok('picking another measure updates title and statewide total',
-    (await page.$eval('#title', e => e.textContent)) === other.title && ofoot === nf(oy + on), `${other.title} ${ofoot}`);
+    (await page.$eval('#title', e => e.textContent)) === other.name && ofoot === nf(oy + on), `${other.name} ${ofoot}`);
   ok('picking a measure updates the URL', new URL(page.url()).searchParams.get('measure') === other.key);
+  const oHead = await page.evaluate(() => ({
+    name: document.getElementById('measure-name').textContent, yes: document.getElementById('means-yes').textContent,
+    lines: [...document.querySelectorAll('.statewide .pass-line')].map(l => l.style.left)
+  }));
+  ok('header text and pass line follow the measure', oHead.name === other.shortTitle && oHead.yes === other.yes &&
+    oHead.lines.length === 2 && oHead.lines.every(l => l === `${Math.round(other.passShare * 100)}%`), JSON.stringify(oHead));
   await page.selectOption('#measure', MEASURE_KEY);
   await page.waitForTimeout(300);
-  ok('switching back restores the first measure', (await page.$eval('#title', e => e.textContent)) === M.title);
+  ok('switching back restores the first measure', (await page.$eval('#title', e => e.textContent)) === M.name);
   await page.waitForTimeout(5500); // let the re-drop finish before canvas checks
   await page.evaluate(() => window.scrollTo(0, 0));
 

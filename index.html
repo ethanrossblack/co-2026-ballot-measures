@@ -10,10 +10,21 @@
 </head>
 <body>
   <header>
-    <div>
+    <div class="measure-head">
       <h1 id="title">Ballot measure results</h1>
-      <p>Each county’s area is proportional to its votes. Both sides share one scale, so the total area on each side reflects that side’s total votes. Drag counties around.</p>
-      <p id="snapshot-note"></p>
+      <p id="measure-name" class="measure-name"></p>
+      <p id="measure-meta" class="measure-meta"></p>
+      <p class="measure-status"><span id="pass-chip" class="pass-chip" hidden></span> <span id="pass-text"></span> <span id="snapshot-note"></span></p>
+      <div class="vote-means" id="vote-means" hidden>
+        <div class="means yes"><h2><span class="sw yes"></span>A Yes vote</h2><p id="means-yes"></p></div>
+        <div class="means no"><h2><span class="sw no"></span>A No vote</h2><p id="means-no"></p></div>
+      </div>
+      <details class="ballot-title" id="ballot-title" hidden>
+        <summary>Official ballot title</summary>
+        <p id="ballot-title-text"></p>
+        <p id="ballot-title-note" class="ballot-title-note"></p>
+      </details>
+      <p class="measure-source" id="measure-source"></p>
     </div>
     <div class="controls">
       <label class="measure-ctl">
@@ -72,6 +83,7 @@
   <!-- Yes/No containers and their controls. Not rendered; main.js instantiates this when
        CONFIG.showSideContainers is true (or the page is opened with ?sides=on). -->
   <template id="sides-template">
+  <p class="sides-note">Each county’s area is proportional to its votes. Both sides share one scale, so the total area on each side reflects that side’s total votes. Drag counties around.</p>
   <div class="controls stage-controls">
     <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
       Size

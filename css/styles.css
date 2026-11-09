@@ -43,7 +43,7 @@ body {
 header {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: start;
   gap: .75rem 2rem;
   padding: 1rem var(--pad) .5rem;
 }
@@ -52,6 +52,33 @@ h1 {
   margin: 0;
 }
 header p { margin: .2rem 0 0; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+/* Measure header: number, Blue Book short name, type line, pass status, Yes/No meanings, ballot title */
+.measure-head { flex: 1 1 36rem; min-width: 0; max-width: 58rem; }
+header .measure-name { margin: .15rem 0 0; color: var(--ink); font: 600 clamp(1.05rem, 2vw, 1.3rem)/1.25 "Barlow", system-ui, sans-serif; }
+header .measure-meta { margin-top: .3rem; font-size: .9rem; }
+header .measure-status { margin-top: .45rem; color: var(--ink); }
+#snapshot-note { color: var(--muted); font-size: .9rem; }
+.pass-chip {
+  display: inline-block; padding: .05rem .5rem; border-radius: 4px;
+  font-weight: 600; font-size: .85rem; color: var(--bar-ink); vertical-align: .05em;
+}
+.pass-chip.yes { background: var(--yes); }
+.pass-chip.no { background: var(--no); }
+.pass-chip[hidden], .vote-means[hidden], .ballot-title[hidden] { display: none; }
+.vote-means { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .7rem; }
+.means { border-left: 4px solid; padding: .1rem 0 .1rem .65rem; }
+.means.yes { border-color: var(--yes); }
+.means.no { border-color: var(--no); }
+.means h2 { display: flex; align-items: center; gap: .35rem; margin: 0; font: 600 .95rem/1.2 "Barlow", system-ui, sans-serif; }
+header .means p { margin-top: .2rem; color: var(--ink); font-size: .92rem; max-width: none; }
+.ballot-title { margin-top: .6rem; font-size: .9rem; }
+.ballot-title summary { cursor: pointer; font-weight: 600; width: fit-content; }
+.ballot-title summary:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
+header .ballot-title p { margin-top: .35rem; font-size: .9rem; max-width: 80ch; }
+header .ballot-title-note:empty { display: none; }
+header .measure-source { margin-top: .5rem; font-size: .85rem; }
+header .measure-source a { color: inherit; }
+.sides-note { margin: 0; padding: .25rem var(--pad) 0; color: var(--muted); font-size: .95rem; max-width: calc(70ch + 2 * var(--pad)); }
 .controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; }
 .stage-controls { margin-left: 0; align-items: center; padding: .5rem var(--pad) 0; }
 button {
@@ -69,7 +96,7 @@ button:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
 .measure-ctl { display: flex; align-items: center; gap: .5rem; font: 600 .9rem "Barlow", system-ui, sans-serif; }
 .measure-ctl select {
   font: inherit; color: var(--ink); background: transparent;
-  border: 1.5px solid var(--line); border-radius: 6px; padding: .35rem .5rem; max-width: 16rem;
+  border: 1.5px solid var(--line); border-radius: 6px; padding: .35rem .5rem; max-width: 22rem;
 }
 .size-ctl { display: flex; align-items: center; gap: .5rem; font: 600 .9rem "Barlow", system-ui, sans-serif; }
 .size-ctl input { width: 8rem; accent-color: var(--ink); }
@@ -182,6 +209,12 @@ th.ctr .sort-btn { justify-content: center; }
 td.split-cell { width: 52%; padding-top: .3rem; padding-bottom: .3rem; }
 .split-wrap { display: flex; flex-direction: column; gap: .2rem; }
 .split { display: flex; height: 1.35rem; border-radius: 4px; overflow: hidden; background: var(--rule); }
+.split { position: relative; }
+/* Share of Yes votes needed to pass, drawn across the statewide bars */
+.pass-line {
+  position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px;
+  background: var(--bar-ink); opacity: .85; pointer-events: none;
+}
 .seg {
   display: flex; align-items: center; padding: 0 .4rem;
   font-size: .8rem; font-weight: 600; color: var(--bar-ink);
@@ -216,6 +249,10 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
 .total-sub { margin-top: .2rem; font-size: .8rem; font-weight: 400; line-height: 1.1; color: var(--muted); }
 .split-sorts { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .table-section .split-sorts button.sort-btn { width: auto; }
+/* Once the picker would wrap under the measure text, put it above instead */
+@media (max-width: 1000px) {
+  header .controls { order: -1; margin-left: 0; }
+}
 @media (max-width: 760px) {
   .stages { grid-template-columns: 1fr; height: auto; }
   .stage { min-height: 65vh; }
@@ -234,6 +271,7 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
   .controls { margin-left: 0; width: 100%; }
   .measure-ctl { width: 100%; }
   .measure-ctl select { flex: 1; min-width: 0; max-width: none; }
+  .vote-means { grid-template-columns: 1fr; gap: .5rem; }
 }
 @media (max-width: 380px) {
   .table-section { padding-left: .5rem; padding-right: .5rem; }

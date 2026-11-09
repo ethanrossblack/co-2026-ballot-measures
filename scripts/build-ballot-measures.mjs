@@ -2,11 +2,17 @@
 // from a Secretary of State results XML snapshot into a small JavaScript module
 // (`export default {...}`) that the page imports.
 //
-// Usage: node scripts/build-ballot-measures.mjs [input.xml] [output.js]
+// Each measure is joined with its Blue Book text from data/measure-info.json (short name,
+// ballot title, what a Yes/No vote means, share needed to pass); a measure without an entry
+// stops the build.
+//
+// Usage: node scripts/build-ballot-measures.mjs [input.xml] [output.js] [info.json]
 import { readFileSync, writeFileSync } from "node:fs";
 
 const input = process.argv[2] ?? "data/all_co_results.xml";
 const output = process.argv[3] ?? "data/ballot-measures.js";
+const infoFile = process.argv[4] ?? "data/measure-info.json";
+const INFO = JSON.parse(readFileSync(infoFile, "utf8"));
 
 const ENTITIES = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };
 const decode = s => s.replace(/&(amp|lt|gt|quot|apos);/g, m => ENTITIES[m]);
@@ -59,11 +65,19 @@ for (const c of contests) {
   const sum = ch => Object.values(ch.counties).reduce((a, b) => a + b, 0);
   if (sum(yes) !== Number(yes.totalVotes)) problems.push(`Yes/For county sum ${sum(yes)} != totalVotes ${yes.totalVotes}`);
   if (sum(no) !== Number(no.totalVotes)) problems.push(`No/Against county sum ${sum(no)} != totalVotes ${no.totalVotes}`);
+  // "Amendment 87 (CONSTITUTIONAL)" -> name "Amendment 87", kind "constitutional"
+  const label = c.text.match(/^((?:Amendment|Proposition) [0-9A-Z]+) \((CONSTITUTIONAL|STATUTORY)\)$/);
+  if (!label) problems.push("title is not of the form 'Amendment 87 (CONSTITUTIONAL)'");
+  const info = label && INFO.measures[label[1]];
+  if (label && !info) problems.push(`no entry for "${label[1]}" in ${infoFile}`);
   if (problems.length) throw new Error(`Contest ${c.key} "${c.text}": ${problems.join("; ")}`);
 
   measures.push({
     key: c.key,
     title: c.text,
+    name: label[1],
+    kind: label[2].toLowerCase(),
+    ...info,
     precinctsReportingPercent: Number(c.precinctsReportingPercent),
     counties: Object.fromEntries(names.map(n => [n, { yes: yes.counties[n], no: no.counties[n] }]))
   });
@@ -75,6 +89,7 @@ const out = {
   election: tag(xml, "ElectionName"),
   date: tag(xml, "ElectionDate"),
   snapshot: tag(xml, "Timestamp"),
+  source: INFO.source,
   measures
 };
 writeFileSync(output, `export default ${JSON.stringify(out)};\n`);

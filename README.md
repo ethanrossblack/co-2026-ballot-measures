@@ -6,6 +6,7 @@ Both containers share one scale, so you can compare the Yes and No sides by eye:
 
 ## Features
 
+- **What each measure does.** The header shows the measure's short name, whether it changes the constitution or statutes, how it reached the ballot, the share of the vote it needs to pass (55% for most constitutional amendments, a majority otherwise) and whether it is currently passing. Below that are the official "What your vote means" statements for Yes and No, and the full ballot title (collapsed). All of this text comes from the 2026 Blue Book, the state's ballot information booklet, and links to each measure's full analysis. The statewide bars mark the share needed to pass.
 - **Pick a measure** from the dropdown (Amendments 81-87 and Propositions NN, 132-137 in the current data). The choice is stored in the URL, e.g. `?measure=6060`, so you can share a link to a specific measure.
 - **Circles or map shapes.** Counties start as equal-area circles. One click morphs them into their real outlines (and back).
 - **Try the map layout (experimental).** The **Try map layout** button (or `?layout=map`) starts each container as the real state of Colorado, holds for a second, then resizes every county to its vote area. The final layout is computed so that no county touches or overlaps another: counties stay as close to their place on the map as possible, and the smaller ones, which have to give way, crowd toward the edges and corners to make room for big front-range counties. The scale is a little smaller than in the falling layout to leave room for the gaps. In this mode the first button switches between the **physical map** (real shapes and places) and the **vote-proportional map**, animating between them. When you let go of a dragged county, it and any counties it pushed glide back to their spots without colliding. Gravity is off in this mode; you can still drag and shake.
@@ -51,6 +52,8 @@ The page reads `data/ballot-measures.js`, which is generated from the Secretary 
 
 3. Commit and push.
 
+The script also joins each measure with its Blue Book text from `data/measure-info.json`, keyed by measure name (`"Amendment 87"`). That file is maintained by hand from the Quick Ballot Reference Guide in the [2026 Blue Book](https://content.leg.colorado.gov/sites/default/files/2026-blue-book-en-accessible.pdf): short name, origin (`initiative` or `legislature`), `passShare` (0.55 or 0.5, as the booklet states for each measure), ballot title, the Yes and No statements, and the PDF page of the full analysis. The build stops if a statewide measure has no entry.
+
 The script keeps only statewide ballot measures: contests with `Yes/For` and `No/Against` choices that cover all 64 counties. Judicial retention, candidate races and measures that cover only some counties are skipped and counted in the summary it prints. It stops with an error if a measure is missing a county or if county votes don't add up to the XML's totals.
 
 ## Project layout
@@ -72,6 +75,7 @@ src/                        ES modules
 data/
   colorado-topo.js          trimmed county outlines used by the page
   ballot-measures.js        generated results used by the page
+  measure-info.json         Blue Book text for each measure (hand-maintained source)
   colorado-counties.json    original county TopoJSON
   all_co_results.xml        Secretary of State results snapshot (source)
 scripts/build-ballot-measures.mjs   XML -> data/ballot-measures.js

@@ -64,9 +64,67 @@ function syncDropBtn() {
     : "Animate each county to its vote area, spaced so none touch";
 }
 
-function showResults(res, title) {
+// Header: measure number, Blue Book short name, type/origin/threshold, pass status,
+// what a Yes and a No vote mean, and the official ballot title (collapsed)
+const ORIGIN = { initiative: "Citizen initiative", legislature: "Referred by the legislature" };
+const KIND = { constitutional: "Constitutional amendment", statutory: "Statutory change" };
+const needText = p => (p > 0.5 ? `at least ${d3.format(".0%")(p)}` : "a majority");
+
+function showMeasureInfo(m, res) {
+  const set = (id, text) => (document.getElementById(id).textContent = text ?? "");
+  set("title", m.name ?? m.title);
+  set("measure-name", m.shortTitle);
+  set("measure-meta", [KIND[m.kind], ORIGIN[m.origin], m.passShare && `Needs ${needText(m.passShare)} to pass`]
+    .filter(Boolean).join(" · "));
+  const all = res.totals.yes + res.totals.no;
+  const share = all ? res.totals.yes / all : 0;
+  const chip = document.getElementById("pass-chip");
+  chip.hidden = !(m.passShare && all);
+  if (!chip.hidden) {
+    // A majority means more than half; the 55% rule is "at least 55 percent of the votes cast"
+    const passing = m.passShare > 0.5 ? share >= m.passShare : share > 0.5;
+    chip.textContent = passing ? "Passing" : "Failing";
+    chip.className = `pass-chip ${passing ? "yes" : "no"}`;
+    set("pass-text", `Yes has ${pct(share)} of the vote and needs ${needText(m.passShare)}.`);
+  } else set("pass-text", "");
+  document.getElementById("vote-means").hidden = !(m.yes && m.no);
+  set("means-yes", m.yes);
+  set("means-no", m.no);
+  document.getElementById("ballot-title").hidden = !m.ballotTitle;
+  set("ballot-title-text", m.ballotTitle);
+  set("ballot-title-note", m.ballotTitleNote);
+  const src = document.getElementById("measure-source");
+  src.replaceChildren();
+  if (measureData.source?.url) {
+    const a = Object.assign(document.createElement("a"), {
+      href: m.page ? `${measureData.source.url}#page=${m.page}` : measureData.source.url,
+      textContent: `full analysis in the Blue Book${m.page ? ` (PDF, p. ${m.page})` : ""}`,
+      target: "_blank", rel: "noopener"
+    });
+    src.append("Source: Colorado Legislative Council Staff; ", a, ".");
+  }
+  markPassLine(m.passShare);
+}
+
+// A thin line across both statewide bars at the Yes share needed to pass
+function markPassLine(p) {
+  document.querySelectorAll(".statewide").forEach(sw => {
+    const bar = sw.querySelector(".split");
+    if (bar && p) {
+      const line = document.createElement("span");
+      line.className = "pass-line";
+      line.style.left = `${p * 100}%`;
+      line.title = `${d3.format(".0%")(p)} Yes needed to pass`;
+      bar.append(line);
+    }
+    sw.querySelector(".statewide-cap").textContent = p
+      ? `Statewide votes · line at ${d3.format(".0%")(p)}, the Yes share needed to pass`
+      : "Statewide votes";
+  });
+}
+
+function showResults(res) {
   current = res;
-  document.getElementById("title").textContent = title;
   const all = res.totals.yes + res.totals.no;
   for (const side of ["yes", "no"]) {
     const el = document.getElementById(`total-${side}`);
@@ -169,7 +227,9 @@ function showMeasure(key, { updateUrl = true } = {}) {
   measureSelect.value = m.key;
   document.getElementById("snapshot-note").textContent =
     `${measureData.election}. ${m.precinctsReportingPercent}% of precincts reporting as of ${measureData.snapshot}.`;
-  showResults(measureToResults(m), m.title);
+  const res = measureToResults(m);
+  showResults(res); // builds the statewide bars that showMeasureInfo marks
+  showMeasureInfo(m, res);
   if (updateUrl) {
     const url = new URL(location.href);
     url.searchParams.set("measure", m.key);
@@ -187,7 +247,9 @@ function loadMeasures() {
     msg("No ballot measures found. Run node scripts/build-ballot-measures.mjs to generate data/ballot-measures.js.");
     return;
   }
-  for (const m of measureData.measures) measureSelect.add(new Option(m.title, m.key));
+  for (const m of measureData.measures) {
+    measureSelect.add(new Option(m.shortTitle ? `${m.name}: ${m.shortTitle}` : m.title, m.key));
+  }
   measureSelect.disabled = false;
   showMeasure(new URLSearchParams(location.search).get("measure"), { updateUrl: false });
 }
