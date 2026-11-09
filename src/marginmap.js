@@ -176,7 +176,20 @@ export function createMarginMap(sectionEl) {
     return pts;
   }
 
+  // Finished layouts by measure and stage size, so returning to a measure (or resizing back) is
+  // instant. Only results that carry a measure key are cached.
+  const layoutCache = new Map();
   function rebuild() {
+    const cacheKey = res?.key != null ? `${res.key}|${W}x${H}` : null;
+    const cached = cacheKey && layoutCache.get(cacheKey);
+    if (cached) { ({ items, split, overlaps } = cached); return; }
+    computeLayout();
+    if (!cacheKey) return;
+    layoutCache.set(cacheKey, { items, split, overlaps });
+    if (layoutCache.size > 40) layoutCache.delete(layoutCache.keys().next().value); // resizes add sizes
+  }
+
+  function computeLayout() {
     items = [];
     if (!res || !W || !H) return;
     const rows = COUNTIES.map(c => {
@@ -257,22 +270,31 @@ export function createMarginMap(sectionEl) {
     W = stage.clientWidth; H = stage.clientHeight; dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
+    lastFrameKey = null; // resizing the canvas clears it
     mapM = CONFIG.mapMargin * Math.min(W / MAP_BOUNDS.w, H / MAP_BOUNDS.h);
     if (res) restart();
   }
 
   // New data or a new stage size: rebuild the layout and stay on the current stage. Moving
-  // between stages only happens when a button is pressed.
+  // between stages only happens when a button is pressed. A layout can take a few hundred ms,
+  // so it runs just after the next paint: the rest of the page (table, title) updates first,
+  // and the canvas keeps its previous picture until the new layout is ready.
+  let pendingRebuild = 0;
   function restart() {
-    rebuild();
-    anim = { from: anim.to, to: anim.to, t0: performance.now(), dur: 1 };
-    syncButtons();
+    if (pendingRebuild) return; // one rebuild covers every change made before it runs
+    pendingRebuild = requestAnimationFrame(() => setTimeout(() => {
+      pendingRebuild = 0;
+      rebuild();
+      anim = { from: anim.to, to: anim.to, t0: performance.now(), dur: 1 };
+      lastFrameKey = null;
+      const m = res.totals.yes - res.totals.no;
+      totalEl.textContent = m === 0 ? "Statewide: tied" : `Statewide: ${SIDE_NAME[m > 0 ? "yes" : "no"]} by ${fmt(Math.abs(m))} votes`;
+      syncButtons();
+    }, 0));
   }
 
   function setData(results) {
     res = results;
-    const m = res.totals.yes - res.totals.no;
-    totalEl.textContent = m === 0 ? "Statewide: tied" : `Statewide: ${SIDE_NAME[m > 0 ? "yes" : "no"]} by ${fmt(Math.abs(m))} votes`;
     restart();
   }
 
@@ -329,7 +351,7 @@ export function createMarginMap(sectionEl) {
     }
     return null;
   }
-  const pick = () => hit()?.id ?? null;
+  const pick = () => (pendingRebuild ? null : hit()?.id ?? null);
 
   // The wedge ("yes" / "no") under the pointer once the pie has settled
   function pieSide() {
@@ -413,10 +435,24 @@ export function createMarginMap(sectionEl) {
     ctx.restore();
   }
 
+  // Everything a still frame depends on. While no stage is animating and this is unchanged,
+  // the canvas already shows the right picture, so draw() skips the redraw.
+  let lastFrameKey = null;
+  function frameKey(colors, highlightId, isSource, now) {
+    return [items.length && items, anim.to, settled(now), W, H, dpr, highlightId, isSource,
+      pointer ? `${pointer.x},${pointer.y}` : "", Object.values(colors).join(), document.fonts?.status];
+  }
+  const sameKey = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
+
   function draw(colors, highlightId, isSource) {
+    if (pendingRebuild) return; // items and res disagree until the rebuild runs
+    const now = performance.now();
+    const key = frameKey(colors, highlightId, isSource, now);
+    if (settled(now) && sameKey(key, lastFrameKey)) return;
+    lastFrameKey = key;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const now = performance.now(), P = progress(now);
+    const P = progress(now);
     ctx.lineJoin = "round";
     // The whole container is tinted for the statewide winner, except while the two halves are
     // tinted for their own sides (stage 2); the two tints trade places between stages
@@ -480,23 +516,6 @@ export function createMarginMap(sectionEl) {
         ctx.stroke(w);
       }
     } else if (P > 2 && items.length) { // outline fades in over the morph
-      ctx.save();
-      ctx.globalAlpha = (P - 2) ** 3;
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = colors.line;
-      for (const side of ["yes", "no"]) ctx.stroke(wedgePath(side));
-      ctx.restore();
-    }
-    if (P >= 2.999 && items.length) { // the finished pie: two solid wedges
-      for (const side of ["yes", "no"]) {
-        const w = wedgePath(side);
-        ctx.fillStyle = side === pieSide() ? colors.active : colors[side];
-        ctx.fill(w);
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = colors.line;
-        ctx.stroke(w);
-      }
-    } else if (P > 2 && items.length) { // the wedge outline fades in over the morph
       ctx.save();
       ctx.globalAlpha = (P - 2) ** 3;
       ctx.lineWidth = 1.5;

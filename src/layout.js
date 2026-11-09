@@ -2,6 +2,10 @@
 // Each county is a convex hull (a superset of its shape) at its final size. Hulls start at
 // their map positions and are relaxed: overlapping or too-close pairs are pushed apart (the
 // smaller county yields more), while a weak pull keeps everything near its map position.
+//
+// This runs tens of thousands of pair tests per layout, so the inner loops avoid allocating:
+// hull points and edge normals live in typed arrays and the separating-axis result is written
+// to a few shared variables instead of returned as an object.
 
 // items: [{ id, hull: [[x, y]] relative to the county's anchor, home: {x, y}, start?: {x, y} }]
 // (start defaults to home; pull is the per-step fraction of the way home during the growth stages)
@@ -9,59 +13,101 @@
 export function layoutHulls(items, W, H, { pad = 4, margin = 6, stages = 8, perStage = 40, settle = 800, pull = 0.03 } = {}) {
   let g = 1; // current growth factor: hulls grow from small to full size so the layout evolves smoothly
   const nodes = items.map(it => {
-    const hull = it.hull;
-    const normals = hull.map((p, i) => {
-      const q = hull[(i + 1) % hull.length];
+    const hull = it.hull, m = hull.length;
+    const hx = new Float64Array(m), hy = new Float64Array(m), nx = new Float64Array(m), ny = new Float64Array(m);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < m; i++) {
+      const p = hull[i], q = hull[(i + 1) % m];
+      hx[i] = p[0]; hy[i] = p[1];
       const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy) || 1;
-      return [dy / len, -dx / len];
-    });
+      nx[i] = dy / len; ny[i] = -dx / len;
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    }
+    // The hull's extent along each of its own edge normals at scale 1 and anchor (0, 0); at
+    // growth g and anchor (x, y) it is g * [own0, own1] + (x, y) . normal, so it needn't be recomputed
+    const own0 = new Float64Array(m), own1 = new Float64Array(m);
+    for (let i = 0; i < m; i++) {
+      let a = Infinity, b = -Infinity;
+      for (let j = 0; j < m; j++) {
+        const d = hx[j] * nx[i] + hy[j] * ny[i];
+        if (d < a) a = d;
+        if (d > b) b = d;
+      }
+      own0[i] = a; own1[i] = b;
+    }
+    const start = it.start ?? it.home;
     return {
-      id: it.id, hull, normals, home: it.home, x: (it.start ?? it.home).x, y: (it.start ?? it.home).y,
-      minX: Math.min(...hull.map(p => p[0])), maxX: Math.max(...hull.map(p => p[0])),
-      minY: Math.min(...hull.map(p => p[1])), maxY: Math.max(...hull.map(p => p[1])),
-      area: Math.abs(d3.polygonArea(hull)) || 1
+      id: it.id, home: it.home, x: start.x, y: start.y, hx, hy, nx, ny, own0, own1, m, minX, maxX, minY, maxY,
+      root: Math.sqrt(Math.abs(d3.polygonArea(hull)) || 1)
     };
   });
 
-  const interval = (n, axis) => {
-    let lo = Infinity, hi = -Infinity;
-    for (const [px, py] of n.hull) {
-      const d = (px * g + n.x) * axis[0] + (py * g + n.y) * axis[1];
+  // Projection of a hull onto an axis (another hull's edge normal), written to lo / hi
+  let lo = 0, hi = 0;
+  function project(n, ax, ay) {
+    lo = Infinity; hi = -Infinity;
+    const { hx, hy, m, x, y } = n;
+    for (let i = 0; i < m; i++) {
+      const d = (hx[i] * g + x) * ax + (hy[i] * g + y) * ay;
       if (d < lo) lo = d;
       if (d > hi) hi = d;
     }
-    return [lo, hi];
-  };
+  }
 
-  // Separating-axis test with a gap: null if at least `pad` apart, else the push (a -> b)
-  function overlap(a, b) {
+  // Overlap depth of a and b along one edge normal: axis i of a (k = 0) or of b (k = 1).
+  // The two extents are left in a0..a1 and b0..b1.
+  let a0 = 0, a1 = 0, b0 = 0, b1 = 0;
+  function axisDepth(a, b, k, i) {
+    const src = k ? b : a;
+    const ax = src.nx[i], ay = src.ny[i], off = src.x * ax + src.y * ay;
+    const s0 = src.own0[i] * g + off, s1 = src.own1[i] * g + off;
+    project(k ? a : b, ax, ay);
+    if (k) { a0 = lo; a1 = hi; b0 = s0; b1 = s1; } else { a0 = s0; a1 = s1; b0 = lo; b1 = hi; }
+    return Math.min(a1, b1) - Math.max(a0, b0) + pad;
+  }
+
+  // Separating-axis test with a gap: false if at least `pad` apart, else true with the push
+  // (a -> b) in hitDepth / hitX / hitY. Axes are tried a's edges first, then b's. Pairs move
+  // little between steps, so the axis that last separated a pair is tried first; that can only
+  // end the test sooner, never change its answer.
+  const sepAxis = new Int32Array(nodes.length * nodes.length).fill(-1); // k * 65536 + i, or -1
+  const APART = 0.05; // pairs sitting exactly at the gap count as apart
+  let hitDepth = 0, hitX = 0, hitY = 0;
+  function overlap(a, b, pair) {
     if (a.x + a.maxX * g + pad <= b.x + b.minX * g || b.x + b.maxX * g + pad <= a.x + a.minX * g ||
-        a.y + a.maxY * g + pad <= b.y + b.minY * g || b.y + b.maxY * g + pad <= a.y + a.minY * g) return null;
-    let best = null;
-    for (const axis of [...a.normals, ...b.normals]) {
-      const [a0, a1] = interval(a, axis), [b0, b1] = interval(b, axis);
-      const depth = Math.min(a1, b1) - Math.max(a0, b0) + pad;
-      if (depth <= 0.05) return null; // pairs sitting exactly at the gap count as apart
-      if (!best || depth < best.depth) {
-        const sign = (b0 + b1) / 2 >= (a0 + a1) / 2 ? 1 : -1;
-        best = { depth, nx: axis[0] * sign, ny: axis[1] * sign };
+        a.y + a.maxY * g + pad <= b.y + b.minY * g || b.y + b.maxY * g + pad <= a.y + a.minY * g) return false;
+    const cached = sepAxis[pair];
+    if (cached >= 0 && axisDepth(a, b, cached >> 16, cached & 0xffff) <= APART) return false;
+    hitDepth = Infinity;
+    for (let k = 0; k < 2; k++) {
+      const src = k ? b : a;
+      for (let i = 0; i < src.m; i++) {
+        const depth = axisDepth(a, b, k, i);
+        if (depth <= APART) { sepAxis[pair] = (k << 16) | i; return false; }
+        if (depth < hitDepth) {
+          const sign = (b0 + b1) / 2 >= (a0 + a1) / 2 ? 1 : -1;
+          hitDepth = depth; hitX = src.nx[i] * sign; hitY = src.ny[i] * sign;
+        }
       }
     }
-    return best;
+    return true;
   }
 
   function step(pull) {
     let count = 0;
     if (pull) for (const n of nodes) { n.x += (n.home.x - n.x) * pull; n.y += (n.home.y - n.y) * pull; }
     for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
       for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        const hit = overlap(a, b);
-        if (!hit) continue;
+        const b = nodes[j];
+        if (!overlap(a, b, i * nodes.length + j)) continue;
         count++;
-        const wa = Math.sqrt(b.area) / (Math.sqrt(a.area) + Math.sqrt(b.area)), wb = 1 - wa;
-        a.x -= hit.nx * hit.depth * wa; a.y -= hit.ny * hit.depth * wa;
-        b.x += hit.nx * hit.depth * wb; b.y += hit.ny * hit.depth * wb;
+        const wa = b.root / (a.root + b.root), wb = 1 - wa;
+        a.x -= hitX * hitDepth * wa; a.y -= hitY * hitDepth * wa;
+        b.x += hitX * hitDepth * wb; b.y += hitY * hitDepth * wb;
       }
     }
     for (const n of nodes) { // keep every hull inside the stage

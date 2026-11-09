@@ -163,8 +163,11 @@ const server = http.createServer((req, res) => {
   // ---- Hover: canvas -> other canvas -----------------------------------------------
   await page.locator('.side[data-side="yes"] canvas').scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
   const yc = await page.locator('.side[data-side="yes"] canvas').boundingBox();
+  // The margin map only redraws when something changes, so record from before the hover starts
+  // (nothing is highlighted while the pointer is off the canvases, so no stale labels leak in)
+  await page.mouse.move(600, 5); await page.waitForTimeout(200); await clearTexts();
   await page.mouse.move(yc.x + 85, yc.y + 85); await page.mouse.move(yc.x + 90, yc.y + 90);
-  await page.waitForTimeout(200); await clearTexts();
+  await page.waitForTimeout(200);
   const onYes = await countyLabels();
   ok('hovering a shape labels both containers and the margin map',
     onYes.length === 3 && onYes.every(t => t.startsWith('Denver County:')) && onYes.some(t => /Denver County: (Yes|No) by [\d,]+ votes \(\d+\.\d% margin\)/.test(t)), JSON.stringify(onYes));
