@@ -54,10 +54,6 @@ The page reads `data/ballot-measures.js`, which is generated from the Secretary 
 
 `fetch-results.mjs` asks the [results site](https://results.enr.clarityelections.com/CO/127407/web.345435/#/summary) for its current results version (`current_ver.txt`), downloads that version's `reports/detailxml.zip`, saves the `detail.xml` inside as `data/all_co_results.xml` and runs the build below. If the snapshot timestamp matches the file already in the repo it does nothing. If the build fails it puts the previous XML back, so the XML and `data/ballot-measures.js` always match. Options: `--force` rebuilds even when nothing changed, `--no-build` only downloads, `--ver <n>` pins a results version, `--election <id>` picks another Clarity election (default `127407`, the 2026 General), `--out <file>` writes the XML somewhere else.
 
-### Automatic refresh (GitHub Actions)
-
-`.github/workflows/refresh-results.yml` runs the same script every hour (at :17 UTC) and commits `data/all_co_results.xml` and `data/ballot-measures.js` when the snapshot has changed; hours with no new results add no commit. Start a run by hand from the repository's **Actions** tab > **Refresh election results** > **Run workflow**; tick *force* to rebuild even if nothing changed. If a run fails (the results site is down or blocks the request, or a new measure has no Blue Book entry), nothing is committed and GitHub emails you. To stop it after the election, disable the workflow in the Actions tab or delete the file.
-
 To build from an XML you already have:
 
 ```bash
@@ -91,7 +87,6 @@ data/
   colorado-counties.json    original county TopoJSON
   all_co_results.xml        Secretary of State results snapshot (source)
 scripts/fetch-results.mjs   downloads the latest XML, then runs the build
-.github/workflows/refresh-results.yml   runs fetch-results hourly and commits new data
 scripts/build-ballot-measures.mjs   XML -> data/ballot-measures.js
 archive/                    two earlier, self-contained prototypes
 dev-tools/                  headless-browser tests
