@@ -2,15 +2,29 @@ import { CONFIG } from "./config.js";
 import { fmt, msg, pct } from "./format.js";
 import { measureToResults } from "./results.js";
 import { fitSegLabels, setTableData } from "./table.js";
-import { createSim } from "./sim.js";
 import { createMarginMap } from "./marginmap.js";
 import { state } from "./state.js";
 import BALLOT_MEASURES from "../data/ballot-measures.js";
 
 // ---------- Page ----------
 
-const sims = ["yes", "no"].map(side =>
-  createSim(side, document.querySelector(`.side[data-side="${side}"]`)));
+const sidesEnabled = CONFIG.showSideContainers || new URLSearchParams(location.search).get("sides") === "on";
+let sims = [];
+if (sidesEnabled) {
+  // Mount the Yes/No containers + controls, then load the physics libraries and the sim
+  const loadScript = src => new Promise((resolve, reject) => {
+    const s = Object.assign(document.createElement("script"), { src });
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.append(s);
+  });
+  document.getElementById("sides-mount").replaceWith(document.getElementById("sides-template").content);
+  await loadScript("https://cdn.jsdelivr.net/npm/poly-decomp@0.3.0/build/decomp.min.js");
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js");
+  const { createSim } = await import("./sim.js");
+  sims = ["yes", "no"].map(side =>
+    createSim(side, document.querySelector(`.side[data-side="${side}"]`)));
+}
 const marginMap = createMarginMap(document.querySelector(".margin-section"));
 let current = null;
 
@@ -24,7 +38,7 @@ function readColors() {
 let sizeFactor = 1;
 
 function dropBoth() {
-  if (!current) return;
+  if (!current || !sims.length) return;
   const { totals } = current;
   // One shared scale: the side with more votes fills `fillRatio` of the smaller stage
   // The size slider scales linear dimensions, so area scales with its square
@@ -35,8 +49,9 @@ function dropBoth() {
 
 // In the map layout this button switches between the physical map and the vote-proportional
 // layout (with an animation); in the falling layout it replays the drop.
-const dropBtn = document.getElementById("drop");
+const dropBtn = document.getElementById("drop"); // null while the Yes/No containers are off
 function syncDropBtn() {
+  if (!dropBtn) return;
   if (state.layoutMode !== "map") {
     dropBtn.textContent = "Drop again";
     dropBtn.title = "Drop the counties again";
@@ -54,8 +69,8 @@ function showResults(res, title) {
   document.getElementById("title").textContent = title;
   const all = res.totals.yes + res.totals.no;
   for (const side of ["yes", "no"]) {
-    document.getElementById(`total-${side}`).textContent =
-      `${fmt(res.totals[side])} votes, ${pct(all ? res.totals[side] / all : 0)}`;
+    const el = document.getElementById(`total-${side}`);
+    if (el) el.textContent = `${fmt(res.totals[side])} votes, ${pct(all ? res.totals[side] / all : 0)}`;
   }
   const notes = [];
   if (res.unmatched.length) notes.push(`Rows not matched to a county: ${res.unmatched.join(", ")}.`);
@@ -66,54 +81,58 @@ function showResults(res, title) {
   marginMap.setData(res);
 }
 
-const sizeInput = document.getElementById("size");
-const sizeOut = document.getElementById("size-out");
-sizeInput.addEventListener("input", () => {
-  sizeOut.textContent = `${Math.round(sizeInput.value * 100)}%`; // live readout; re-drop on release
-});
-sizeInput.addEventListener("change", () => {
-  sizeFactor = Number(sizeInput.value);
-  dropBoth();
-});
-dropBtn.addEventListener("click", () => {
-  if (state.layoutMode !== "map") return dropBoth();
-  sims.forEach(s => s.toggleView());
-  syncDropBtn();
-});
-document.getElementById("shake").addEventListener("click", () => sims.forEach(s => s.shake()));
-const shapeBtn = document.getElementById("shape");
-shapeBtn.addEventListener("click", () => {
-  state.shapeMode = state.shapeMode === "map" ? "circle" : "map";
-  shapeBtn.setAttribute("aria-pressed", String(state.shapeMode === "circle"));
-  shapeBtn.textContent = state.shapeMode === "circle" ? "Show map shapes" : "Show as circles";
-  sims.forEach(s => s.morph(state.shapeMode));
-});
-const gravityBtn = document.getElementById("gravity");
-const gravityOn = () => gravityBtn.getAttribute("aria-pressed") === "true";
-gravityBtn.addEventListener("click", () => {
-  const on = !gravityOn();
-  gravityBtn.setAttribute("aria-pressed", String(on));
-  gravityBtn.textContent = on ? "Gravity on" : "Gravity off";
-  sims.forEach(s => { s.setGravity(on); if (!on) s.shake(); });
-});
+function wireSideControls() {
+  const sizeInput = document.getElementById("size");
+  const sizeOut = document.getElementById("size-out");
+  sizeInput.addEventListener("input", () => {
+    sizeOut.textContent = `${Math.round(sizeInput.value * 100)}%`; // live readout; re-drop on release
+  });
+  sizeInput.addEventListener("change", () => {
+    sizeFactor = Number(sizeInput.value);
+    dropBoth();
+  });
+  dropBtn.addEventListener("click", () => {
+    if (state.layoutMode !== "map") return dropBoth();
+    sims.forEach(s => s.toggleView());
+    syncDropBtn();
+  });
+  document.getElementById("shake").addEventListener("click", () => sims.forEach(s => s.shake()));
+  const shapeBtn = document.getElementById("shape");
+  shapeBtn.addEventListener("click", () => {
+    state.shapeMode = state.shapeMode === "map" ? "circle" : "map";
+    shapeBtn.setAttribute("aria-pressed", String(state.shapeMode === "circle"));
+    shapeBtn.textContent = state.shapeMode === "circle" ? "Show map shapes" : "Show as circles";
+    sims.forEach(s => s.morph(state.shapeMode));
+  });
+  const gravityBtn = document.getElementById("gravity");
+  const gravityOn = () => gravityBtn.getAttribute("aria-pressed") === "true";
+  gravityBtn.addEventListener("click", () => {
+    const on = !gravityOn();
+    gravityBtn.setAttribute("aria-pressed", String(on));
+    gravityBtn.textContent = on ? "Gravity on" : "Gravity off";
+    sims.forEach(s => { s.setGravity(on); if (!on) s.shake(); });
+  });
 
-// Layout: "fall" drops counties into a pile; "map" starts as the state and resizes in place
-const layoutBtn = document.getElementById("layout");
-function setLayout(mode, { redrop = true } = {}) {
-  state.layoutMode = mode;
-  const map = mode === "map";
-  layoutBtn.setAttribute("aria-pressed", String(map));
-  layoutBtn.textContent = map ? "Back to falling" : "Try map layout";
-  gravityBtn.disabled = map; // the springs replace gravity
-  sims.forEach(s => s.setGravity(gravityOn()));
-  if (map && state.shapeMode !== "map") { // outlines show the state; the re-drop below builds them
-    state.shapeMode = "map";
-    shapeBtn.setAttribute("aria-pressed", "false");
-    shapeBtn.textContent = "Show as circles";
+  // Layout: "fall" drops counties into a pile; "map" starts as the state and resizes in place
+  const layoutBtn = document.getElementById("layout");
+  function setLayout(mode, { redrop = true } = {}) {
+    state.layoutMode = mode;
+    const map = mode === "map";
+    layoutBtn.setAttribute("aria-pressed", String(map));
+    layoutBtn.textContent = map ? "Back to falling" : "Try map layout";
+    gravityBtn.disabled = map; // the springs replace gravity
+    sims.forEach(s => s.setGravity(gravityOn()));
+    if (map && state.shapeMode !== "map") { // outlines show the state; the re-drop below builds them
+      state.shapeMode = "map";
+      shapeBtn.setAttribute("aria-pressed", "false");
+      shapeBtn.textContent = "Show as circles";
+    }
+    if (redrop) dropBoth(); else syncDropBtn();
   }
-  if (redrop) dropBoth(); else syncDropBtn();
+  layoutBtn.addEventListener("click", () => setLayout(state.layoutMode === "map" ? "fall" : "map"));
+  return setLayout;
 }
-layoutBtn.addEventListener("click", () => setLayout(state.layoutMode === "map" ? "fall" : "map"));
+const setLayout = sidesEnabled ? wireSideControls() : null;
 
 let resizeTimer;
 window.addEventListener("resize", () => {
@@ -158,7 +177,7 @@ function showMeasure(key, { updateUrl = true } = {}) {
   }
 }
 
-if (new URLSearchParams(location.search).get("layout") === "map") setLayout("map", { redrop: false });
+if (setLayout && new URLSearchParams(location.search).get("layout") === "map") setLayout("map", { redrop: false });
 
 measureSelect.addEventListener("change", () => showMeasure(measureSelect.value));
 

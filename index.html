@@ -38,28 +38,7 @@
     <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
     <div class="stage"><canvas aria-label="Vote margin by county"></canvas></div>
   </section>
-  <div class="controls stage-controls">
-    <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
-      Size
-      <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
-      <output id="size-out" for="size">100%</output>
-    </label>
-    <button id="drop" type="button">Drop again</button>
-    <button id="layout" type="button" aria-pressed="false" title="Experimental: start as the state of Colorado, then resize each county to its votes">Try map layout</button>
-    <button id="shake" type="button">Shake</button>
-    <button id="shape" type="button" aria-pressed="true">Show map shapes</button>
-    <button id="gravity" type="button" aria-pressed="true">Gravity on</button>
-  </div>
-  <main class="stages">
-    <section class="side" data-side="yes">
-      <div class="side-head"><span class="swatch"></span><h2>Yes</h2><span class="total" id="total-yes"></span></div>
-      <div class="stage"><canvas aria-label="Yes votes by county"></canvas></div>
-    </section>
-    <section class="side" data-side="no">
-      <div class="side-head"><span class="swatch"></span><h2>No</h2><span class="total" id="total-no"></span></div>
-      <div class="stage"><canvas aria-label="No votes by county"></canvas></div>
-    </section>
-  </main>
+  <div id="sides-mount"></div>
   <section class="table-section" aria-labelledby="table-title">
     <h2 id="table-title">Results by county</h2>
     <div class="statewide"><span class="statewide-cap">Statewide votes</span><div class="statewide-bar"></div></div>
@@ -90,11 +69,36 @@
       <tfoot></tfoot>
     </table>
   </section>
+  <!-- Yes/No containers and their controls. Not rendered; main.js instantiates this when
+       CONFIG.showSideContainers is true (or the page is opened with ?sides=on). -->
+  <template id="sides-template">
+  <div class="controls stage-controls">
+    <label class="size-ctl" title="Scale every county shape; re-drops the counties when released">
+      Size
+      <input id="size" type="range" min="0.5" max="1.5" step="0.05" value="1" aria-label="Shape size">
+      <output id="size-out" for="size">100%</output>
+    </label>
+    <button id="drop" type="button">Drop again</button>
+    <button id="layout" type="button" aria-pressed="false" title="Experimental: start as the state of Colorado, then resize each county to its votes">Try map layout</button>
+    <button id="shake" type="button">Shake</button>
+    <button id="shape" type="button" aria-pressed="true">Show map shapes</button>
+    <button id="gravity" type="button" aria-pressed="true">Gravity on</button>
+  </div>
+  <main class="stages">
+    <section class="side" data-side="yes">
+      <div class="side-head"><span class="swatch"></span><h2>Yes</h2><span class="total" id="total-yes"></span></div>
+      <div class="stage"><canvas aria-label="Yes votes by county"></canvas></div>
+    </section>
+    <section class="side" data-side="no">
+      <div class="side-head"><span class="swatch"></span><h2>No</h2><span class="total" id="total-no"></span></div>
+      <div class="stage"><canvas aria-label="No votes by county"></canvas></div>
+    </section>
+  </main>
+  </template>
 
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/poly-decomp@0.3.0/build/decomp.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<!-- poly-decomp and Matter.js are loaded by main.js only when the Yes/No containers are enabled -->
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

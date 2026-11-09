@@ -72,7 +72,7 @@ const server = http.createServer((req, res) => {
     return u.startsWith('http://127.0.0.1') ? route.continue() : route.abort();
   });
 
-  await page.goto(`${HTML}?measure=${MEASURE_KEY}`);
+  await page.goto(`${HTML}?sides=on&measure=${MEASURE_KEY}`);
   await page.waitForSelector('#measure option', { state: 'attached' });
   await page.waitForTimeout(5500); // let the staggered drop finish (64 counties x 70 ms)
 

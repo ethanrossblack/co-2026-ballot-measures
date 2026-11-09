@@ -2,7 +2,7 @@ import { CONFIG } from "./config.js";
 import { fmt, pct } from "./format.js";
 import { COUNTIES, MAP_BOUNDS } from "./counties.js";
 import { layoutHulls } from "./layout.js";
-import { alignTo, easeInOut, resample } from "./shapes.js";
+import { alignTo, easeInOut, resample } from "./geometry.js";
 
 // ---------- Margin map ----------
 // One map of Colorado, sized by vote margin (|Yes - No|) and coloured for the winner. It moves
