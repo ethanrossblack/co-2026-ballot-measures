@@ -68,17 +68,17 @@ const loadGap = d => (2 * Math.abs(d)) / (1 + Math.abs(d));
 // Everything is proportional to the drawing width w. Pan-local frame: origin at the
 // centre of the pan's rim, y down; the bowl is the lower half of an a x b ellipse.
 function geometry(w) {
-  const a = 0.135 * w, maxTilt = (S.maxTiltDeg * Math.PI) / 180;
-  const R = 0.31 * w, lift = R * Math.sin(maxTilt);
+  const a = 0.16 * w, maxTilt = (S.maxTiltDeg * Math.PI) / 180;
+  const R = 0.285 * w, lift = R * Math.sin(maxTilt);
   const g = {
     w, cx: w / 2, R, a, b: 0.8 * a, th: 0.11 * a, maxTilt,
-    chainH: 1.75 * a,        // hook to rim
+    chainH: 1.45 * a,        // hook to rim
     wallH: 0.6 * a,          // invisible walls above the rim that keep a heap from spilling
     beamW: Math.max(5, 0.015 * w), ringR: Math.max(4, 0.011 * w)
   };
-  g.dialR = 0.11 * w;                         // the measuring dial above the pivot
-  g.pivotY = Math.max(lift + 0.06 * w, 0.205 * w); // room above the beam for the dial
-  g.hubY = g.pivotY - 0.065 * w;              // the needle's pivot
+  g.dialR = 0.15 * w;                         // the measuring dial above the pivot
+  g.pivotY = Math.max(lift + 0.06 * w, 0.25 * w); // room above the beam for the dial
+  g.hubY = g.pivotY - 0.07 * w;               // the needle's pivot
   g.dialGain = S.dialSweepDeg / S.maxTiltDeg;
   g.baseTop = g.pivotY + lift + g.chainH + g.b + g.th + 0.03 * w; // clear of the lowest pan
   g.baseH = 0.035 * w;
@@ -416,15 +416,15 @@ function drawGauge(passShare) {
   }
   // Ticks every point of share, labelled every 5 (every 10 on a small dial) with the leading side's share
   const lo = Math.ceil(50 * (1 - S.fullTiltGap)), hi = 100 - lo;
-  const labelEvery = r >= 60 ? 5 : 10;
+  const labelEvery = r >= 60 ? 5 : 10, bigDial = r >= 90;
   ctx.strokeStyle = colors.ink;
   ctx.fillStyle = colors.ink;
-  ctx.font = `600 ${r >= 60 ? 11 : 9}px "Barlow", system-ui, sans-serif`;
+  ctx.font = `600 ${bigDial ? 13 : r >= 60 ? 11 : 9}px "Barlow", system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (let q = lo; q <= hi; q++) {
     const phi = dialGain * restAngle(q / 100), major = q % 5 === 0;
-    ctx.lineWidth = major ? 1.5 : 1;
+    ctx.lineWidth = major ? (bigDial ? 2 : 1.5) : 1;
     ctx.beginPath();
     line(phi, major ? 0.72 * r : 0.79 * r, 0.92 * r);
     ctx.stroke();
@@ -443,22 +443,38 @@ function drawGauge(passShare) {
     ctx.fill();
   }
 
-  // Needle (the beam's angle times the gear ratio) and hub
+  // Needle (the beam's angle times the gear ratio): a tapered pointer with a counterweight tail,
+  // outlined in the face colour so it stands out against the ticks and band
   const phi = dialGain * beam.a;
-  ctx.strokeStyle = colors.ink;
-  ctx.lineWidth = Math.max(2, 0.004 * w);
-  ctx.lineCap = "round";
+  const px = Math.cos(phi), py = -Math.sin(phi); // across the needle
+  const hw = Math.max(2.5, 0.035 * r), tw = hw * 0.7;
+  const [tx, ty] = at(phi, 0.95 * r), [bx, by] = at(phi, -0.2 * r);
   ctx.beginPath();
-  line(phi, -0.08 * r, 0.9 * r);
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(cx + px * hw, hubY + py * hw);
+  ctx.lineTo(bx + px * tw, by + py * tw);
+  ctx.lineTo(bx - px * tw, by - py * tw);
+  ctx.lineTo(cx - px * hw, hubY - py * hw);
+  ctx.closePath();
+  ctx.arc(bx, by, Math.max(3, 0.06 * r), 0, 2 * Math.PI);
+  ctx.fillStyle = colors.ink;
+  ctx.strokeStyle = colors.face;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = "round";
   ctx.stroke();
+  ctx.fill();
   ctx.fillStyle = colors.metal;
   ctx.beginPath();
-  ctx.arc(cx, hubY, Math.max(3, 0.07 * r), 0, 2 * Math.PI);
+  ctx.arc(cx, hubY, Math.max(4, 0.075 * r), 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.fillStyle = colors.ink;
+  ctx.beginPath();
+  ctx.arc(cx, hubY, Math.max(1.5, 0.03 * r), 0, 2 * Math.PI);
   ctx.fill();
 
   // Reading on either side of the dial; at a stop the share is at least the end of the scale
   const p = readShare(beam.a), pinned = Math.abs(beam.a) >= maxTilt - 1e-6;
-  const big = w >= 600 ? 16 : 13, small = w >= 600 ? 12 : 10, gap = 0.025 * w;
+  const big = w >= 600 ? 22 : 15, small = w >= 600 ? 13 : 11, gap = 0.025 * w;
   const y = hubY - 0.62 * r;
   SIDES.forEach((side, i) => {
     const share = i === 0 ? p : 1 - p;
