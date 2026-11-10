@@ -67,10 +67,10 @@ The script keeps only statewide ballot measures: contests with `Yes/For` and `No
 
 ## Rebuild the county outlines
 
-The page reads `data/county-outlines.js`: county outlines already projected and simplified, so the browser does no map work at load. It is generated from `data/colorado-counties.json` and only needs rebuilding if the source shapes or the level of detail change:
+The page reads `data/county-outlines.js`: county outlines already projected and simplified, plus each county's home point on the state map and the state's bounding box, so the browser does no map work at load. It is generated from `data/colorado-counties.json` and only needs rebuilding if the source shapes or the level of detail change:
 
 ```bash
-npm install                                   # once: d3-geo and topojson-client (build only)
+npm install                                   # once: d3-geo, d3-polygon and topojson-client (build only)
 npm run build:outlines                        # or: node scripts/build-outlines.mjs [--tolerance 0.25] [input.json] [output.js]
 ```
 
@@ -99,7 +99,7 @@ src/                        ES modules
   shapes.js                 outline simplification, resampling, physics bodies
   sim.js                    one physics world (one container)
 data/
-  county-outlines.js        projected, simplified county outlines used by the page (generated)
+  county-outlines.js        projected, simplified county outlines, home points and state bounds (generated)
   ballot-measures.js        generated results used by the page
   measure-info.json         Blue Book text for each measure (hand-maintained source)
   colorado-counties.json    original county TopoJSON (source)
