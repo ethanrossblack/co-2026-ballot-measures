@@ -1,7 +1,6 @@
 export const CONFIG = {
   showSideContainers: false, // Yes/No physics containers and their controls; ?sides=on also enables them
   fillRatio: 0.40,       // share of a stage covered by the larger side's counties
-  outlineSimplify: 0.2,  // county outline simplification at load, in projected units (1000 = state width or height)
   simplifyPx: 0.8,       // collision-shape simplification tolerance, px
   minLabelPx: 46,        // label counties whose smaller side is at least this
   dropIntervalMs: 70,

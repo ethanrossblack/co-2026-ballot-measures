@@ -1,0 +1,12 @@
+{
+  "name": "colorado-county-viz",
+  "private": true,
+  "description": "Build tools for the county outlines. The site itself is static and needs no packages.",
+  "scripts": {
+    "build:outlines": "node scripts/build-outlines.mjs"
+  },
+  "devDependencies": {
+    "d3-geo": "3.1.2",
+    "topojson-client": "3.1.0"
+  }
+}
