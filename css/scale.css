@@ -16,6 +16,11 @@
   }
 }
 .scale-section { flex: none; padding: .25rem var(--pad) var(--pad); }
+.scale-section .margin-note { margin-bottom: .3rem; }
+.scale-how { margin: 0 0 .6rem; color: var(--muted); font-size: .92rem; max-width: 70ch; }
+.scale-how summary { cursor: pointer; font-weight: 600; color: var(--ink); width: fit-content; }
+.scale-how summary:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
+.scale-how p { margin: .3rem 0 0; }
 .scale-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin: 0 0 .5rem; }
 #scale-verdict { font-weight: 600; font-variant-numeric: tabular-nums; }
 /* Width and stage height are set by scale.js so the whole scale fits the window */
@@ -29,7 +34,43 @@
 .pan-label.no .swatch { background: var(--no); }
 .pan-label .total { color: var(--muted); font-variant-numeric: tabular-nums; }
 .scale-stage { position: relative; }
+/* Wide screens: the votes table beside the scale, which stays in view while the table scrolls */
+@media (min-width: 1100px) {
+  .scale-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(26rem, 32rem); align-items: start; }
+  .scale-layout .scale-section { position: sticky; top: var(--bar-h, 0px); }
+  .scale-layout .votes-section { margin: 0; padding-left: 0; }
+}
+/* Editable votes table (styles.css supplies the table, sticky header and statewide row) */
+.votes-note { margin: 0 0 .6rem; color: var(--muted); font-size: .95rem; max-width: 70ch; }
+.votes-section .table-tools { gap: .5rem 1rem; }
+.edit-count { color: var(--muted); font-size: .9rem; }
+.reset-votes:disabled { opacity: .45; cursor: default; background: none; }
+.votes-table th, .votes-table td { vertical-align: middle; }
+.votes-table th .sw { margin-right: .25rem; }
+.votes-table td.num, .votes-table th.num { text-align: right; }
+.votes-table td.share { color: var(--muted); width: 5.5rem; }
+.votes-table input {
+  width: 100%; max-width: 9rem; text-align: right;
+  font: 400 .95rem "Barlow", system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  color: var(--ink); background: transparent;
+  border: 1.5px solid var(--rule); border-radius: 5px; padding: .25rem .45rem;
+}
+.votes-table input:hover { border-color: var(--muted); }
+.votes-table input:focus-visible { outline: 2px solid var(--line); outline-offset: 1px; border-color: var(--line); }
+.votes-table input.edited { font-weight: 600; border-color: var(--line); background: var(--hover-bg); }
+.votes-table .county-body tr:hover { background: var(--hover-bg); }
+.votes-table button.row-reset {
+  padding: 0 .3rem; margin-left: .2rem; border: none; line-height: 1.2;
+  font-size: 1rem; color: var(--muted);
+}
+.votes-table button.row-reset:hover { color: var(--ink); }
+.votes-table button.row-reset[hidden] { display: none; }
 @media (max-width: 560px) {
+  .votes-table input { font-size: .85rem; padding: .2rem .3rem; }
+  .votes-table td.share { width: auto; }
   .pan-label h3 { font-size: 1.25rem; }
   .pan-label .total { font-size: .85rem; }
+}
+@media (max-width: 400px) {
+  .votes-table .share, .votes-table .share-col { display: none; }
 }

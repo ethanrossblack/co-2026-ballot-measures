@@ -3,6 +3,7 @@ import { countyLabel, fmt, msg, pct } from "./format.js";
 import { measureToResults } from "./results.js";
 import { COUNTY_BY_ID } from "./counties.js";
 import BALLOT_MEASURES from "../data/ballot-measures.js";
+import { createVoteTable } from "./scale-table.js";
 
 // ---------- Scale page: Yes and No votes weighed on a balance ----------
 // Everything is simulated. Matter.js handles the circles: each pan's pile lives in the pan's
@@ -33,14 +34,18 @@ const engine = Engine.create({ positionIterations: 10, velocityIterations: 8, en
 engine.gravity.scale = 0; // gravity is applied per pan in stepBalance()
 const runner = Runner.create({ isFixed: true, delta: 1000 / 60 });
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const sideBySide = window.matchMedia("(min-width: 1100px)"); // matches the layout rule in scale.css
 
 let L = null;           // geometry and balance constants for the current width (see geometry())
 let dpr = 1;
 let results = null, scaleK = 0, measure = null;
-let items = [];         // dropped circles: { body, side, id, name, votes, r, idx, born, landed }
+let votes = new Map();  // editable copy of results.byId: county id -> { yes, no }
+let colorIdx = new Map(); // county id -> drop order (alternates the two fills)
+let tableHover = null;  // county id hovered or focused in the votes table
+let items = [];         // circles: { body, side, id, name, r (drawn radius), target, idx, born, landed }
 const byBody = new Map(); // Matter body id -> item
 let walls = [];
-let queue = [];         // counties still to drop, biggest first
+let queue = [];         // county ids still to drop, biggest first
 let tick = 0;
 const beam = { a: 0, v: 0 };                         // angle (rad, + = Yes side down), angular velocity
 const swing = SIDES.map(() => ({ phi: 0, w: 0 }));   // each pan's swing angle on its chains, + = toward the right
@@ -94,8 +99,15 @@ const ASPECT = geometry(1000).h / 1000;
 
 function resize() {
   const avail = frameEl.parentElement.clientWidth - parseFloat(getComputedStyle(frameEl.parentElement).paddingLeft) * 2;
-  // Fit the whole scale in the window where possible, but never narrower than 300 px
-  const byHeight = (window.innerHeight - 150) / ASPECT;
+  // Fit the whole scale in the window where possible, but never narrower than 300 px. Beside the
+  // table (wide layout) the scale section is pinned, so it must fit below the picker bar.
+  let chrome = 150;
+  if (sideBySide.matches) {
+    const section = frameEl.closest(".scale-section");
+    const bar = document.querySelector(".measure-bar").offsetHeight;
+    chrome = bar + stage.getBoundingClientRect().top - section.getBoundingClientRect().top + 24;
+  }
+  const byHeight = (window.innerHeight - chrome) / ASPECT;
   const w = Math.floor(Math.max(Math.min(avail, 300), Math.min(avail, MAX_W, byHeight)));
   if (L && L.w === w) return;
   L = geometry(w);
@@ -132,22 +144,44 @@ function buildWalls() {
 const panOf = item => SIDES.indexOf(item.side);
 const spawnY = r => -L.wallH - r - 6;
 
-function spawnCounty({ id, v, idx }) {
-  const name = COUNTY_BY_ID.get(id).name;
-  SIDES.forEach((side, i) => {
-    const votes = v[side];
-    if (!votes) return;
-    const r = Math.sqrt((votes * scaleK) / Math.PI);
-    const pr = Math.max(r, S.minBodyR);
-    const spread = Math.max(0, L.a * 0.55 - pr);
-    const body = Bodies.circle(i * PAN_GAP + (Math.random() * 2 - 1) * spread, spawnY(pr), pr,
-      { friction: 0.4, frictionStatic: 0.8, frictionAir: 0.015, restitution: 0.05, slop: 0.05 });
-    Body.setMass(body, Math.PI * r * r * DENSITY); // weight follows the votes, even for the size floor
-    Composite.add(engine.world, body);
-    const it = { body, side, id, name, votes, r, idx, born: performance.now(), landed: false };
-    items.push(it);
-    byBody.set(body.id, it);
-  });
+function spawnCircle(id, side) {
+  const v = votes.get(id)[side];
+  if (!v) return;
+  const i = SIDES.indexOf(side);
+  const r = Math.sqrt((v * scaleK) / Math.PI);
+  const pr = Math.max(r, S.minBodyR);
+  const spread = Math.max(0, L.a * 0.55 - pr);
+  const body = Bodies.circle(i * PAN_GAP + (Math.random() * 2 - 1) * spread, spawnY(pr), pr,
+    { friction: 0.4, frictionStatic: 0.8, frictionAir: 0.015, restitution: 0.05, slop: 0.05 });
+  Body.setMass(body, Math.PI * r * r * DENSITY); // weight follows the votes, even for the size floor
+  Composite.add(engine.world, body);
+  const it = { body, side, id, name: COUNTY_BY_ID.get(id).name, r, target: r, idx: colorIdx.get(id), born: performance.now(), landed: false };
+  items.push(it);
+  byBody.set(body.id, it);
+}
+const spawnCounty = id => SIDES.forEach(side => spawnCircle(id, side));
+
+// Edited counties grow or shrink a few percent per step toward their new size, so the pile
+// makes room gently; a circle shrunk to nothing leaves the pan
+function resizeCircles() {
+  let gone = false;
+  for (const it of items) {
+    if (it.r === it.target) continue;
+    it.r = it.target > it.r ? Math.min(it.target, it.r * 1.03 + 0.05) : Math.max(it.target, it.r * 0.97 - 0.05);
+    if (it.r <= 0) { gone = true; continue; }
+    const f = Math.max(it.r, S.minBodyR) / it.body.circleRadius;
+    if (f !== 1) Body.scale(it.body, f, f);
+    Body.setMass(it.body, Math.PI * it.r * it.r * DENSITY);
+    Sleeping.set(it.body, false);
+  }
+  if (gone) {
+    items = items.filter(it => {
+      if (it.r > 0) return true;
+      Composite.remove(engine.world, it.body);
+      byBody.delete(it.body.id);
+      return false;
+    });
+  }
 }
 
 // Hook point of each pan, relative to the pivot, and its derivative with respect to the angle
@@ -211,6 +245,10 @@ function settleBalance() {
 Events.on(engine, "beforeUpdate", () => {
   if (!L) return;
   if (queue.length && ++tick % S.dropEvery === 0) spawnCounty(queue.shift());
+  resizeCircles();
+  // What each pan carries: the circles that have landed in it
+  loads.fill(0);
+  for (const it of items) if (it.landed) loads[panOf(it)] += it.body.mass;
   stepBalance(DT);
   // While the balance moves, the piles feel it: wake them and push them with the pan's gravity
   const moving = Math.abs(beam.v) > 0.03 || swing.some(p => Math.abs(p.w) > 0.03);
@@ -231,7 +269,6 @@ function land(b, other) {
   if (!other.isStatic && !byBody.get(other.id)?.landed) return;
   it.landed = true;
   const i = panOf(it);
-  loads[i] += b.mass;
   const fps = 1000 / runner.delta; // Matter velocities are px per step
   const J = { x: b.mass * b.velocity.x * fps, y: b.mass * b.velocity.y * fps }; // in the pan's frame
   const p = swing[i], sp = Math.sin(p.phi), cp = Math.cos(p.phi);
@@ -251,12 +288,21 @@ Events.on(engine, "afterUpdate", () => {
     const p = it.body.position, ox = panOf(it) * PAN_GAP;
     if (p.y > L.b + 400 || Math.abs(p.x - ox) > L.a + 400) {
       // Escaped: back to the top of its pan, no longer weighing on it
-      if (it.landed) { loads[panOf(it)] -= it.body.mass; it.landed = false; }
+      it.landed = false;
       Body.setPosition(it.body, { x: ox, y: spawnY(it.body.circleRadius) });
       Body.setVelocity(it.body, { x: 0, y: 0 });
     }
   }
 });
+
+const sumVotes = () => {
+  const t = { yes: 0, no: 0 };
+  for (const v of votes.values()) { t.yes += v.yes; t.no += v.no; }
+  return t;
+};
+// One scale for both pans: the heavier side fills `fill` of a bowl's cross-section, so a full
+// pan always holds the heavier side (the dial's graduation relies on it)
+const fitScale = t => { const max = Math.max(t.yes, t.no); return max ? (S.fill * Math.PI * L.a * L.b) / 2 / max : 0; };
 
 function drop({ instant = reduceMotion.matches } = {}) {
   for (const it of items) Composite.remove(engine.world, it.body);
@@ -264,21 +310,44 @@ function drop({ instant = reduceMotion.matches } = {}) {
   byBody.clear();
   loads.fill(0); // the empty pans weigh the same, so the beam swings back to level
   tick = 0;
-  if (!results || !L) { queue = []; return; }
-  // One scale for both pans: the heavier side fills `fill` of a bowl's cross-section
-  const max = Math.max(results.totals.yes, results.totals.no);
-  scaleK = max ? (S.fill * (Math.PI * L.a * L.b) / 2) / max : 0;
+  if (!votes.size || !L) { queue = []; return; }
+  scaleK = fitScale(sumVotes());
   // Biggest counties first: they settle at the bottom and the small ones fill the gaps
-  queue = [...results.byId]
-    .map(([id, v]) => ({ id, v }))
-    .sort((x, y) => y.v.yes + y.v.no - (x.v.yes + x.v.no) || x.id.localeCompare(y.id))
-    .map((c, idx) => ({ ...c, idx }));
+  queue = [...votes]
+    .sort(([a, x], [b, y]) => y.yes + y.no - (x.yes + x.no) || a.localeCompare(b))
+    .map(([id]) => id);
+  colorIdx = new Map(queue.map((id, idx) => [id, idx]));
   if (instant) {
     settleBalance();
     while (queue.length) Engine.update(engine, runner.delta);
     for (let s = 0; s < 600; s++) Engine.update(engine, runner.delta);
     for (const it of items) it.born = -Infinity;
     settleBalance(); // skip the remaining sway
+  }
+}
+
+// After an edit: refit the shared scale, then every circle eases to its new size (circles
+// of counties raised from zero drop in); the beam answers on its own as the weights change
+function applyVotes() {
+  if (!L) return;
+  const totals = sumVotes();
+  const k = fitScale(totals);
+  if (k) scaleK = k; // all zero: keep the scale, every circle shrinks away
+  const queued = new Set(queue);
+  for (const [id, v] of votes) {
+    if (queued.has(id)) continue; // not dropped yet; it will use the new numbers
+    for (const side of SIDES) {
+      const r = Math.sqrt((v[side] * scaleK) / Math.PI);
+      const it = items.find(x => x.id === id && x.side === side);
+      if (it) it.target = r;
+      else if (r > 0) spawnCircle(id, side);
+    }
+  }
+  showTotals(totals);
+  if (reduceMotion.matches) {
+    for (let s = 0; s < 300; s++) Engine.update(engine, runner.delta);
+    for (const it of items) it.born = -Infinity;
+    settleBalance();
   }
 }
 
@@ -393,7 +462,7 @@ function drawGauge(passShare) {
   const y = hubY - 0.62 * r;
   SIDES.forEach((side, i) => {
     const share = i === 0 ? p : 1 - p;
-    const value = `${pinned && share > 0.5 ? "≥ " : ""}${pct(share)}`;
+    const value = `${pinned ? (share > 0.5 ? "≥ " : "≤ ") : ""}${pct(share)}`;
     const x = i === 0 ? cx - r - gap : cx + r + gap;
     ctx.textAlign = i === 0 ? "right" : "left";
     ctx.textBaseline = "alphabetic";
@@ -511,7 +580,7 @@ function draw(now) {
 
   const hovered = pick(H);
   canvas.style.cursor = hovered ? "pointer" : "default";
-  const hid = hovered?.id;
+  const hid = hovered?.id ?? (votes.has(tableHover) ? tableHover : null);
   SIDES.forEach((side, i) => {
     ctx.save();
     ctx.translate(H[i].x, H[i].y);
@@ -547,11 +616,11 @@ function draw(now) {
     ctx.restore();
   });
 
-  if (hovered) {
-    const r = results.byId.get(hovered.id);
+  if (hid) {
+    const v = votes.get(hid);
     for (const it of items.filter(x => x.id === hid)) {
-      const share = r.yes + r.no ? it.votes / (r.yes + r.no) : 0;
-      const text = countyLabel(it.name, it.side, it.votes, share);
+      const share = v.yes + v.no ? v[it.side] / (v.yes + v.no) : 0;
+      const text = countyLabel(it.name, it.side, v[it.side], share);
       if (it === hovered) {
         const above = pointer.y - 34;
         tooltip(text, pointer.x + 14, above < 4 ? pointer.y + 18 : above);
@@ -588,13 +657,25 @@ function showMeasureInfo(m, res) {
     chip.className = `pass-chip ${passing ? "yes" : "no"}`;
     set("pass-text", `Yes has ${pct(share)} of the vote and needs ${needText(m.passShare)}.`);
   } else set("pass-text", "");
-  for (const side of SIDES) set(`total-${side}`, `${fmt(res.totals[side])} votes, ${pct(all ? res.totals[side] / all : 0)}`);
-  const gap = res.totals.yes - res.totals.no;
-  const verdict = gap === 0 ? "The two sides weigh exactly the same."
-    : `${gap > 0 ? "Yes" : "No"} outweighs ${gap > 0 ? "No" : "Yes"} by ${fmt(Math.abs(gap))} votes.`;
-  set("scale-verdict", verdict);
-  canvas.setAttribute("aria-label", `Balance scale: Yes ${fmt(res.totals.yes)} votes, No ${fmt(res.totals.no)} votes. ${verdict}`);
 }
+
+// Pan labels and verdict follow the numbers on the scale, which may be edited
+function showTotals(t) {
+  const all = t.yes + t.no;
+  for (const side of SIDES) document.getElementById(`total-${side}`).textContent = `${fmt(t[side])} votes, ${pct(all ? t[side] / all : 0)}`;
+  const gap = t.yes - t.no;
+  const edited = table.edited() > 0;
+  const verdict = (gap === 0 ? "The two sides weigh exactly the same."
+    : `${gap > 0 ? "Yes" : "No"} outweighs ${gap > 0 ? "No" : "Yes"} by ${fmt(Math.abs(gap))} votes.`)
+    + (edited ? " (edited numbers)" : "");
+  document.getElementById("scale-verdict").textContent = verdict;
+  canvas.setAttribute("aria-label", `Balance scale: Yes ${fmt(t.yes)} votes, No ${fmt(t.no)} votes. ${verdict}`);
+}
+
+const table = createVoteTable(document.querySelector(".votes-section"), {
+  onEdit: applyVotes,
+  onHover: id => (tableHover = id)
+});
 
 const measureSelect = document.getElementById("measure");
 const data = BALLOT_MEASURES;
@@ -608,6 +689,10 @@ function showMeasure(key, { updateUrl = true } = {}) {
   results = measureToResults(m);
   msg(results.missing.length ? `Counties with no data: ${results.missing.join(", ")}.` : "");
   showMeasureInfo(m, results);
+  // Edits belong to one measure: start from the reported numbers
+  votes = new Map([...results.byId].map(([id, v]) => [id, { ...v }]));
+  table.setData(results.byId, votes);
+  showTotals(sumVotes());
   document.getElementById("page-link").href = `index.html?measure=${m.key}`;
   if (updateUrl) {
     const url = new URL(location.href);
@@ -635,6 +720,8 @@ measureSelect.addEventListener("change", () => showMeasure(measureSelect.value))
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readColors);
 let resizeTimer;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });
+// Opening the explanation moves the scale down; beside the table it must still fit the window
+document.querySelector(".scale-how").addEventListener("toggle", resize);
 
 readColors();
 resize();

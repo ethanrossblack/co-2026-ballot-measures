@@ -27,12 +27,17 @@
     </div>
   </header>
   <div id="msg" role="status"></div>
+  <main class="scale-layout">
   <section class="scale-section" aria-labelledby="scale-title">
     <div class="margin-head">
       <h2 id="scale-title">Weighing the vote</h2>
       <span class="legend"><span class="swatch yes"></span>Yes votes<span class="swatch no"></span>No votes</span>
     </div>
-    <p class="margin-note">Each circle is one county, sized by its votes: its Yes votes go in the left pan and its No votes in the right. Both pans use the same scale, so the circles on each side add up to that side’s statewide votes. Counties drop in from largest to smallest. Everything is simulated: the circles fall and pile up, the beam turns under the weight that has landed in each pan, and the pans swing on their chains. As on a real balance, the tilt grows in proportion to the difference in weight; this one is sensitive enough that a 65–35 result holds it against its stops. The dial at the top is geared to the beam and graduated in vote shares, so the needle reads each side’s percentage; the reading is exact once the scale comes to rest. On measures that need 55% to pass, a notch marks that share.</p>
+    <p class="margin-note">Each circle is one county, sized by its votes: its Yes votes go in the left pan and its No votes in the right, on one shared scale.</p>
+    <details class="scale-how">
+      <summary>How the scale works</summary>
+      <p>Counties drop in from largest to smallest. Everything is simulated: the circles fall and pile up, the beam turns under the weight that has landed in each pan, and the pans swing on their chains. As on a real balance, the tilt grows in proportion to the difference in weight; this one is sensitive enough that a 65–35 result holds it against its stops. The dial at the top is geared to the beam and graduated in vote shares, so the needle reads each side’s percentage; the reading is exact once the scale comes to rest. On measures that need 55% to pass, a notch marks that share.</p>
+    </details>
     <div class="scale-tools">
       <button id="drop" type="button">Drop again</button>
       <span id="scale-verdict" aria-live="polite"></span>
@@ -45,6 +50,27 @@
       <div class="scale-stage"><canvas aria-label="Balance scale weighing Yes votes against No votes"></canvas></div>
     </div>
   </section>
+  <section class="table-section votes-section" aria-labelledby="votes-title">
+    <h2 id="votes-title">Votes by county</h2>
+    <p class="votes-note">Change any count to see how the scale responds: the county’s circle grows or shrinks, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
+    <div class="table-tools">
+      <button class="reset-votes" type="button" disabled>Reset all</button>
+      <span class="edit-count" aria-live="polite"></span>
+    </div>
+    <table class="votes-table">
+      <thead>
+        <tr>
+          <th scope="col">County</th>
+          <th scope="col" class="num"><span class="sw yes"></span> Yes votes</th>
+          <th scope="col" class="num"><span class="sw no"></span> No votes</th>
+          <th scope="col" class="num share-col">% Yes</th>
+        </tr>
+      </thead>
+      <tbody class="statewide-body"></tbody>
+      <tbody class="county-body"></tbody>
+    </table>
+  </section>
+  </main>
 
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
