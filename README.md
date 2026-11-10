@@ -29,7 +29,7 @@ npx serve .
 python3 -m http.server
 ```
 
-Then open the address it prints. A network connection is needed to load the pinned libraries from CDNs ([d3](https://d3js.org) 7.9.0, topojson-client 3.1.0, poly-decomp 0.3.0, [Matter.js](https://brm.io/matter-js/) 0.19.0) and the fonts from Google Fonts (system fonts are used if they fail).
+Then open the address it prints. A network connection is needed to load the pinned libraries from CDNs ([d3](https://d3js.org) 7.9.0, poly-decomp 0.3.0, [Matter.js](https://brm.io/matter-js/) 0.19.0) and the fonts from Google Fonts (system fonts are used if they fail).
 
 ## Publish on GitHub Pages
 
@@ -65,6 +65,19 @@ The script also joins each measure with its Blue Book text from `data/measure-in
 
 The script keeps only statewide ballot measures: contests with `Yes/For` and `No/Against` choices that cover all 64 counties. Judicial retention, candidate races and measures that cover only some counties are skipped and counted in the summary it prints. It stops with an error if a measure is missing a county or if county votes don't add up to the XML's totals.
 
+## Rebuild the county outlines
+
+The page reads `data/county-outlines.js`: county outlines already projected and simplified, so the browser does no map work at load. It is generated from `data/colorado-counties.json` and only needs rebuilding if the source shapes or the level of detail change:
+
+```bash
+npm install                                   # once: d3-geo and topojson-client (build only)
+npm run build:outlines                        # or: node scripts/build-outlines.mjs [--tolerance 0.25] [input.json] [output.js]
+```
+
+These packages are only for the build; the generated file is committed, and GitHub Pages serves the site as plain static files (`node_modules/` is not committed).
+
+The tolerance is in projected units (the state is 1000 wide); the default 0.25 takes the 104k source vertices down to about 6.3k, which stays faithful at the size Denver is drawn on the margin map (about 6 px per unit on a desktop screen). Each border shared by two counties is simplified once, so neighbours always meet exactly, and the script adds back detail wherever simplifying would make two borders cross.
+
 ## Project layout
 
 ```
@@ -78,7 +91,7 @@ src/                        ES modules
   state.js                  small shared mutable state
   format.js                 number formatting and shared helpers
   matter.js                 Matter.js setup
-  counties.js               projects the county outlines
+  counties.js               loads the prebuilt county outlines
   results.js                turns a measure into per-county results
   table.js                  results table, sorting, search
   scale.js                  scale view: beam, pans, circle physics, dial, hover
@@ -86,20 +99,21 @@ src/                        ES modules
   shapes.js                 outline simplification, resampling, physics bodies
   sim.js                    one physics world (one container)
 data/
-  colorado-topo.js          trimmed county outlines used by the page
+  county-outlines.js        projected, simplified county outlines used by the page (generated)
   ballot-measures.js        generated results used by the page
   measure-info.json         Blue Book text for each measure (hand-maintained source)
-  colorado-counties.json    original county TopoJSON
+  colorado-counties.json    original county TopoJSON (source)
   all_co_results.xml        Secretary of State results snapshot (source)
 scripts/fetch-results.mjs   downloads the latest XML, then runs the build
 scripts/build-ballot-measures.mjs   XML -> data/ballot-measures.js
+scripts/build-outlines.mjs  county TopoJSON -> data/county-outlines.js
 dev-tools/                  headless-browser tests
 ```
 
 ## How it works
 
 - **Equal-area map.** County outlines are projected with a conic equal-area projection, so scaling a shape preserves its area relative to the others exactly. A county's shape is scaled so its area equals `votes × k`, where `k` is the single scale shared by both containers.
-- **Physics.** [Matter.js](https://brm.io/matter-js/) simulates each container. A county's collision shape is a simplified, convex-decomposed version of its largest outline; the full-detail outline is what gets drawn.
+- **Physics.** [Matter.js](https://brm.io/matter-js/) simulates each container. A county's collision shape is a simplified, convex-decomposed version of its largest outline; the full outline is what gets drawn.
 - **Data.** The XML is distilled by a script into a small JavaScript module, so the page does no parsing or fetching at runtime.
 
 ## Tests
@@ -130,4 +144,4 @@ for f in src/*.js; do node --input-type=module --check < "$f" || echo "BAD $f"; 
 ## Data and credits
 
 - Election results: Colorado Secretary of State results export (`data/all_co_results.xml`).
-- Built with d3, topojson-client, poly-decomp and Matter.js; fonts are Barlow and Barlow Condensed from Google Fonts.
+- Built with d3, poly-decomp and Matter.js; fonts are Barlow and Barlow Condensed from Google Fonts.

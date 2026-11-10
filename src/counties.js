@@ -1,24 +1,15 @@
-import { CONFIG } from "./config.js";
 import { normName } from "./format.js";
-import { simplify } from "./geometry.js";
-import TOPO from "../data/colorado-topo.js";
+import OUTLINES from "../data/county-outlines.js";
 
 // ---------- County geometry (once) ----------
+// The outlines arrive already projected (equal-area, 1000x1000 frame) and simplified by
+// scripts/build-outlines.mjs, so there is nothing to decode or project here.
 
 function loadCounties() {
-  const fc = topojson.feature(TOPO, TOPO.objects["colorado-counties"]);
-  const projection = d3.geoConicEqualArea()
-    .parallels([37.5, 40.5]).rotate([105.5, 0]).fitSize([1000, 1000], fc);
-  const path = d3.geoPath(projection);
-  return fc.features.map(f => {
-    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
-    // The source outlines have far more detail than any stage can show (about 104k vertices);
-    // simplifying once here makes every draw, hull and hit test cheaper
-    const rings = polys.map(poly => poly.map(ring => simplify(ring.slice(0, -1).map(projection), CONFIG.outlineSimplify)));
+  return OUTLINES.counties.map(({ id, name, projArea, rings }) => {
     // Home = centroid of the largest exterior ring (the county's place on the state map)
     const main = rings.map(p => p[0]).sort((a, b) => Math.abs(d3.polygonArea(b)) - Math.abs(d3.polygonArea(a)))[0];
-    return { id: f.id, name: f.properties.name, key: normName(f.properties.name), rings, projArea: path.area(f),
-      home: d3.polygonCentroid(main) };
+    return { id, name, key: normName(name), rings, projArea, home: d3.polygonCentroid(main) };
   });
 }
 export const COUNTIES = loadCounties();

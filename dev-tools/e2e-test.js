@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // End-to-end checks for ../index.html in a headless browser, with NO network.
 //
-// Matter.js, poly-decomp and topojson-client are replaced with the stand-ins in this folder, so
+// Matter.js and poly-decomp are replaced with the stand-ins in this folder, so
 // bodies sit on a fixed grid instead of falling. That is enough to test hover, labels, the table,
 // sorting, search and layout. It does NOT test real physics (stacking, jitter, dragging, morph visuals).
 //
@@ -32,7 +32,6 @@ function findD3() {
 }
 const D3 = findD3();
 const STUB = path.join(__dirname, 'matter-stub.js');
-const SHIM = path.join(__dirname, 'topojson-shim.js');
 
 let failed = 0;
 const ok = (name, cond, detail = '') => {
@@ -67,7 +66,6 @@ const server = http.createServer((req, res) => {
   await page.route('**/*', route => {
     const u = route.request().url();
     if (u.includes('d3@')) return route.fulfill({ path: D3, contentType: 'text/javascript' });
-    if (u.includes('topojson-client')) return route.fulfill({ path: SHIM, contentType: 'text/javascript' });
     if (u.includes('poly-decomp') || u.includes('matter-js')) return route.fulfill({ path: STUB, contentType: 'text/javascript' });
     return u.startsWith('http://127.0.0.1') ? route.continue() : route.abort();
   });
