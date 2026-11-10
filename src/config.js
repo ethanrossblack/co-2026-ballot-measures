@@ -20,7 +20,7 @@ export const CONFIG = {
     fill: 0.72,          // share of a bowl's cross-section the heavier side's circles cover
     maxTiltDeg: 14,      // the beam's stops
     fullTiltGap: 0.3,    // sensitivity: a final lead of this share of all votes (65-35) settles on the stops
-    dialSweepDeg: 72,    // the dial's needle is geared to the beam: full tilt turns it this far from upright
+    dialSweepDeg: 60,    // the dial's needle is geared to the beam: full tilt turns it this far from upright
     dropEvery: 4,        // physics steps between counties (60 steps per second)
     minBodyR: 1.5,       // smallest collision radius, px; tiny counties are still drawn and weighed at true size
     gravity: 2,          // px/s^2 per px of drawing width, so motion looks the same at every size

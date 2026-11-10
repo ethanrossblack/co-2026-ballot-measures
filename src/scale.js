@@ -76,9 +76,9 @@ function geometry(w) {
     wallH: 0.6 * a,          // invisible walls above the rim that keep a heap from spilling
     beamW: Math.max(5, 0.015 * w), ringR: Math.max(4, 0.011 * w)
   };
-  g.dialR = 0.15 * w;                         // the measuring dial above the pivot
-  g.pivotY = Math.max(lift + 0.06 * w, 0.25 * w); // room above the beam for the dial
-  g.hubY = g.pivotY - 0.07 * w;               // the needle's pivot
+  g.dialR = 0.2 * w;                          // the measuring dial, centred on the pivot
+  g.pivotY = Math.max(lift + 0.06 * w, 0.235 * w); // room above the pivot for the dial
+  g.hubY = g.pivotY;                          // the needle turns on the beam's own pin
   g.dialGain = S.dialSweepDeg / S.maxTiltDeg;
   g.baseTop = g.pivotY + lift + g.chainH + g.b + g.th + 0.03 * w; // clear of the lowest pan
   g.baseH = 0.035 * w;
@@ -384,24 +384,25 @@ function readShare(a) {
   return (1 + (Math.sign(a) * x) / (2 - x)) / 2;
 }
 
-// Measuring dial at the top centre: a needle geared to the beam over a scale graduated in vote
-// shares (left half = Yes ahead, right half = No ahead), with the reading on either side
+// Measuring dial on the pivot: a dial plate behind the beam, graduated in vote shares (left half =
+// Yes ahead, right half = No ahead), and a needle on the beam's pin in front of it (drawNeedle),
+// geared to the beam. The reading is printed on either side of the plate.
+// phi = needle angle from upright, + toward the Yes side (left)
+const dialAt = (phi, rr) => [L.cx - rr * Math.sin(phi), L.hubY - rr * Math.cos(phi)];
+
 function drawGauge(passShare) {
-  const { cx, hubY, pivotY, dialR: r, w, beamW, maxTilt, dialGain } = L;
+  const { cx, hubY, dialR: r, w, maxTilt, dialGain } = L;
   const sweep = dialGain * maxTilt;
-  // phi = needle angle from upright, + toward the Yes side (left)
-  const at = (phi, rr) => [cx - rr * Math.sin(phi), hubY - rr * Math.cos(phi)];
+  const at = dialAt;
   const line = (phi, r0, r1) => { const [x0, y0] = at(phi, r0), [x1, y1] = at(phi, r1); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); };
 
-  ctx.fillStyle = colors["metal-2"];
-  ctx.fillRect(cx - beamW * 0.5, hubY, beamW, pivotY - hubY); // stem down to the pivot housing
   ctx.fillStyle = colors.face;
   ctx.strokeStyle = colors.metal;
   ctx.lineWidth = Math.max(2, 0.004 * w);
   ctx.beginPath();
   ctx.arc(cx, hubY, r, Math.PI, 2 * Math.PI);
-  ctx.lineTo(cx + r, hubY + 0.15 * r);
-  ctx.lineTo(cx - r, hubY + 0.15 * r);
+  ctx.lineTo(cx + r, hubY + 0.22 * r); // the plate reaches below the pin, behind the needle's tail
+  ctx.lineTo(cx - r, hubY + 0.22 * r);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -443,35 +444,6 @@ function drawGauge(passShare) {
     ctx.fill();
   }
 
-  // Needle (the beam's angle times the gear ratio): a tapered pointer with a counterweight tail,
-  // outlined in the face colour so it stands out against the ticks and band
-  const phi = dialGain * beam.a;
-  const px = Math.cos(phi), py = -Math.sin(phi); // across the needle
-  const hw = Math.max(2.5, 0.035 * r), tw = hw * 0.7;
-  const [tx, ty] = at(phi, 0.95 * r), [bx, by] = at(phi, -0.2 * r);
-  ctx.beginPath();
-  ctx.moveTo(tx, ty);
-  ctx.lineTo(cx + px * hw, hubY + py * hw);
-  ctx.lineTo(bx + px * tw, by + py * tw);
-  ctx.lineTo(bx - px * tw, by - py * tw);
-  ctx.lineTo(cx - px * hw, hubY - py * hw);
-  ctx.closePath();
-  ctx.arc(bx, by, Math.max(3, 0.06 * r), 0, 2 * Math.PI);
-  ctx.fillStyle = colors.ink;
-  ctx.strokeStyle = colors.face;
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = "round";
-  ctx.stroke();
-  ctx.fill();
-  ctx.fillStyle = colors.metal;
-  ctx.beginPath();
-  ctx.arc(cx, hubY, Math.max(4, 0.075 * r), 0, 2 * Math.PI);
-  ctx.fill();
-  ctx.fillStyle = colors.ink;
-  ctx.beginPath();
-  ctx.arc(cx, hubY, Math.max(1.5, 0.03 * r), 0, 2 * Math.PI);
-  ctx.fill();
-
   // Reading on either side of the dial; at a stop the share is at least the end of the scale
   const p = readShare(beam.a), pinned = Math.abs(beam.a) >= maxTilt - 1e-6;
   const big = w >= 600 ? 22 : 15, small = w >= 600 ? 13 : 11, gap = 0.025 * w;
@@ -496,6 +468,39 @@ function drawGauge(passShare) {
   });
 }
 
+// Needle (the beam's angle times the gear ratio) on the beam's pin: a tapered pointer with a
+// counterweight tail, outlined in the face colour so it stands out against the ticks and beam
+function drawNeedle() {
+  const { cx, hubY, dialR: r, dialGain } = L;
+  const at = dialAt;
+  const phi = dialGain * beam.a;
+  const px = Math.cos(phi), py = -Math.sin(phi); // across the needle
+  const hw = Math.max(2.5, 0.035 * r), tw = hw * 0.7;
+  const [tx, ty] = at(phi, 0.95 * r), [bx, by] = at(phi, -0.13 * r);
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(cx + px * hw, hubY + py * hw);
+  ctx.lineTo(bx + px * tw, by + py * tw);
+  ctx.lineTo(bx - px * tw, by - py * tw);
+  ctx.lineTo(cx - px * hw, hubY - py * hw);
+  ctx.closePath();
+  ctx.arc(bx, by, Math.max(3, 0.045 * r), 0, 2 * Math.PI);
+  ctx.fillStyle = colors.ink;
+  ctx.strokeStyle = colors.face;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  ctx.fill();
+  ctx.fillStyle = colors.metal;
+  ctx.beginPath();
+  ctx.arc(cx, hubY, Math.max(4, 0.075 * r), 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.fillStyle = colors.ink;
+  ctx.beginPath();
+  ctx.arc(cx, hubY, Math.max(1.5, 0.03 * r), 0, 2 * Math.PI);
+  ctx.fill();
+}
+
 function drawStand() {
   const { cx, pivotY, baseTop, baseH, w, beamW } = L;
   ctx.fillStyle = colors["metal-2"];
@@ -517,22 +522,10 @@ function drawBeam(H) {
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-R, 0);
-  ctx.quadraticCurveTo(-R * 0.45, -0.045 * w, 0, -0.03 * w);
-  ctx.quadraticCurveTo(R * 0.45, -0.045 * w, R, 0);
+  ctx.quadraticCurveTo(-R * 0.5, -0.035 * w, 0, 0); // arms swoop up, meeting at the pin
+  ctx.quadraticCurveTo(R * 0.5, -0.035 * w, R, 0);
   ctx.stroke();
   ctx.restore();
-  // Pivot housing and pin
-  const hr = 0.042 * w;
-  ctx.fillStyle = colors.metal;
-  ctx.beginPath();
-  ctx.moveTo(cx - hr, pivotY - hr * 0.75);
-  ctx.lineTo(cx + hr, pivotY - hr * 0.75);
-  ctx.ellipse(cx, pivotY - hr * 0.75, hr, hr * 1.25, 0, 0, Math.PI);
-  ctx.fill();
-  ctx.fillStyle = colors["metal-2"];
-  ctx.beginPath();
-  ctx.arc(cx, pivotY - hr * 0.1, Math.max(2.5, hr * 0.17), 0, 2 * Math.PI);
-  ctx.fill();
   // Hooks
   ctx.strokeStyle = colors.base;
   ctx.lineWidth = Math.max(2, ringR * 0.5);
@@ -593,6 +586,7 @@ function draw(now) {
   drawStand();
   drawGauge(measure?.passShare);
   drawBeam(H);
+  drawNeedle();
 
   const hovered = pick(H);
   canvas.style.cursor = hovered ? "pointer" : "default";
