@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colorado ballot measures on a scale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/scale.css">
+</head>
+<body>
+  <div class="measure-bar">
+    <div class="bar-row">
+      <label class="measure-ctl">
+        Measure
+        <select id="measure" aria-label="Ballot measure" disabled></select>
+      </label>
+      <a class="page-link" id="page-link" href="index.html">Margin map and table</a>
+    </div>
+  </div>
+  <header>
+    <div class="measure-head">
+      <h1 id="title">Ballot measure results</h1>
+      <p id="measure-name" class="measure-name"></p>
+      <p class="measure-status"><span id="pass-chip" class="pass-chip" hidden></span> <span id="pass-text"></span> <span id="snapshot-note"></span></p>
+    </div>
+  </header>
+  <div id="msg" role="status"></div>
+  <main class="scale-layout">
+  <section class="scale-section" aria-labelledby="scale-title">
+    <div class="margin-head">
+      <h2 id="scale-title">Weighing the vote</h2>
+      <span class="legend"><span class="swatch yes"></span>Yes votes<span class="swatch no"></span>No votes</span>
+    </div>
+    <p class="margin-note">Each circle is one county, sized by its votes: its Yes votes go in the left pan and its No votes in the right, on one shared scale.</p>
+    <details class="scale-how">
+      <summary>How the scale works</summary>
+      <p>Counties drop in from largest to smallest. Everything is simulated: the circles fall and pile up, the beam turns under the weight that has landed in each pan, and the pans swing on their chains. As on a real balance, the tilt grows in proportion to the difference in weight; this one is sensitive enough that a 65–35 result holds it against its stops. The dial at the top is geared to the beam and graduated in vote shares, so the needle reads each side’s percentage; the reading is exact once the scale comes to rest. On measures that need 55% to pass, a notch marks that share.</p>
+    </details>
+    <div class="scale-tools">
+      <button id="drop" type="button">Drop again</button>
+      <span id="scale-verdict" aria-live="polite"></span>
+    </div>
+    <div class="scale-frame">
+      <div class="pan-labels">
+        <div class="pan-label yes"><span class="swatch"></span><h3>Yes</h3><span class="total" id="total-yes"></span></div>
+        <div class="pan-label no"><span class="swatch"></span><h3>No</h3><span class="total" id="total-no"></span></div>
+      </div>
+      <div class="scale-stage"><canvas aria-label="Balance scale weighing Yes votes against No votes"></canvas></div>
+    </div>
+  </section>
+  <section class="table-section votes-section" aria-labelledby="votes-title">
+    <h2 id="votes-title">Votes by county</h2>
+    <p class="votes-note">Turn on <strong>Edit votes</strong> to change any count and see how the scale responds. Changing a county’s total keeps its Yes share; changing its Yes share (slider or percentage) keeps its total. As you edit, the county’s circles grow or shrink, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
+    <div class="table-tools">
+      <button class="edit-votes" type="button" aria-pressed="false">Edit votes</button>
+      <button class="reset-votes" type="button" disabled hidden>Reset all</button>
+      <span class="edit-count" aria-live="polite"></span>
+    </div>
+    <table class="votes-table">
+      <thead>
+        <tr>
+          <th scope="col" aria-sort="ascending"><button type="button" class="sort-btn" data-key="name" data-sort="asc">County<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num" aria-sort="none"><button type="button" class="sort-btn" data-key="yes"><span class="sw yes"></span>Yes votes<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num" aria-sort="none"><button type="button" class="sort-btn" data-key="no"><span class="sw no"></span>No votes<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num share-col" aria-sort="none"><button type="button" class="sort-btn" data-key="share">Yes share<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num total-col" aria-sort="none"><button type="button" class="sort-btn" data-key="total">Total<span class="arrow" aria-hidden="true"></span></button></th>
+        </tr>
+      </thead>
+      <tbody class="statewide-body"></tbody>
+      <tbody class="county-body"></tbody>
+    </table>
+  </section>
+  </main>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script type="module" src="src/scale.js"></script>
+</body>
+</html>

@@ -239,6 +239,7 @@ function showMeasure(key, { updateUrl = true } = {}) {
   const res = measureToResults(m);
   showResults(res); // builds the statewide bars that showMeasureInfo marks
   showMeasureInfo(m, res);
+  document.getElementById("page-link").href = `scale.html?measure=${m.key}`;
   if (updateUrl) {
     const url = new URL(location.href);
     url.searchParams.set("measure", m.key);
