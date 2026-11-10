@@ -314,3 +314,16 @@ td.total-cell { padding-top: .3rem; padding-bottom: .3rem; }
   .split-counts, .margin-sub, .total-sub { font-size: .66rem; }
   .margin-main, .total-main { font-size: .8rem; }
 }
+
+/* Page footer: credit, repo link, data source. margin-top: auto pins it to the bottom on short pages (body is a flex column). */
+.site-footer {
+  margin-top: auto;
+  padding: 1rem var(--pad) 1.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 30%, transparent);
+  color: var(--muted);
+  font-size: .85rem;
+  text-align: center;
+}
+.site-footer p { margin: .15rem 0; }
+.site-footer a { color: inherit; text-underline-offset: 2px; }
+.site-footer a:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }

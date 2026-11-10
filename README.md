@@ -93,7 +93,6 @@ data/
   all_co_results.xml        Secretary of State results snapshot (source)
 scripts/fetch-results.mjs   downloads the latest XML, then runs the build
 scripts/build-ballot-measures.mjs   XML -> data/ballot-measures.js
-archive/                    two earlier, self-contained prototypes
 dev-tools/                  headless-browser tests
 ```
 
@@ -132,4 +131,3 @@ for f in src/*.js; do node --input-type=module --check < "$f" || echo "BAD $f"; 
 
 - Election results: Colorado Secretary of State results export (`data/all_co_results.xml`).
 - Built with d3, topojson-client, poly-decomp and Matter.js; fonts are Barlow and Barlow Condensed from Google Fonts.
-- The `archive/` pages use 2020 Census county populations.
