@@ -43,7 +43,9 @@ export function createVoteTable(section, { onEdit, onHover }) {
   const isEdited = id => SIDES.some(s => votes.get(id)[s] !== original.get(id)[s]);
   const edited = () => [...votes.keys()].filter(isEdited).length;
   const fieldsOf = tr => tr.querySelectorAll("input.field");
-  const fieldText = (v, f) => (f === "share" ? shareText(v) : fmt(f === "total" ? total(v) : v[f]));
+  // The share field is a number input (0-100, with step arrows); "%" is printed beside it
+  const fieldText = (v, f) => (f === "share" ? (total(v) ? (shareOf(v) * 100).toFixed(1) : "")
+    : fmt(f === "total" ? total(v) : v[f]));
   const differs = (v, o, f) => (f === "share" ? shareText(v) !== shareText(o) : f === "total" ? total(v) !== total(o) : v[f] !== o[f]);
 
   function commit({ now = false } = {}) {
@@ -110,10 +112,11 @@ export function createVoteTable(section, { onEdit, onHover }) {
     syncTotals();
   }
 
-  function makeField(name, field, label, inputMode) {
-    const input = Object.assign(document.createElement("input"), {
-      type: "text", inputMode, autocomplete: "off", className: `field ${field === "share" ? "pct" : "count"}`
-    });
+  function makeField(name, field, label) {
+    const input = field === "share"
+      ? Object.assign(document.createElement("input"), { type: "number", min: 0, max: 100, step: 0.1, placeholder: "–", className: "field pct" })
+      : Object.assign(document.createElement("input"), { type: "text", inputMode: "numeric", className: "field count" });
+    input.autocomplete = "off";
     input.dataset.field = field;
     input.setAttribute("aria-label", `${name} ${label}`);
     setInputMode(input);
@@ -143,7 +146,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
       for (const [field, label] of FIELDS) {
         const td = tr.insertCell();
         td.className = `num ${field === "total" ? "total-col" : ""}`;
-        td.append(makeField(name, field, label, "numeric"));
+        td.append(makeField(name, field, label));
       }
       const td = tr.insertCell();
       td.className = "share";
@@ -152,7 +155,9 @@ export function createVoteTable(section, { onEdit, onHover }) {
         type: "range", className: "ratio", min: 0, max: RATIO_STEPS, step: 1
       });
       slider.setAttribute("aria-label", `${name} Yes share slider`);
-      wrap.append(slider, makeField(name, "share", "Yes share, percent", "decimal"));
+      const sign = Object.assign(document.createElement("span"), { className: "pct-sign", textContent: "%" });
+      sign.setAttribute("aria-hidden", "true");
+      wrap.append(slider, makeField(name, "share", "Yes share, percent"), sign);
       td.append(wrap);
       syncRow(tr);
     }

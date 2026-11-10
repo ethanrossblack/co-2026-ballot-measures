@@ -52,10 +52,15 @@
 .votes-table td.share { width: 10.5rem; }
 .ratio-wrap { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; }
 .share-text { min-width: 3.2rem; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-.votes-table input.pct { width: 4.4rem; flex: none; }
+.votes-table input.pct { width: 4.6rem; flex: none; padding-right: .2rem; }
+.ratio-wrap .pct-sign { margin-left: -.3rem; color: var(--muted); font-size: .9rem; }
+/* Read-only: no step arrows, so the share reads like plain text */
+.votes-table input.pct[readonly] { -moz-appearance: textfield; appearance: textfield; padding-right: .45rem; }
+.votes-table input.pct[readonly]::-webkit-inner-spin-button,
+.votes-table input.pct[readonly]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .votes-table input.ratio, .ratio-bar {
   --p: 50%;
-  flex: 0 1 6rem; width: 6rem; min-width: 3rem; height: .6rem; margin: 0; padding: 0;
+  flex: 0 1 5.5rem; width: 5.5rem; min-width: 3rem; height: .6rem; margin: 0; padding: 0;
   border: none; border-radius: 999px;
   background: linear-gradient(to right, var(--yes) var(--p), var(--no) var(--p));
 }
@@ -110,10 +115,14 @@
   .votes-table input { font-size: .78rem; padding: .2rem .2rem; }
   .votes-table input.ratio, .ratio-bar { display: none; }
   .votes-table td.share { width: auto; }
-  .votes-table input.pct { width: 3.4rem; }
+  /* No step arrows on phones (touch browsers don't show them); the keyboard still steps */
+  .votes-table input.pct { width: 3.3rem; -moz-appearance: textfield; appearance: textfield; padding-right: .2rem; }
+  .votes-table input.pct::-webkit-inner-spin-button,
+  .votes-table input.pct::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .ratio-wrap .pct-sign { font-size: .75rem; margin-left: -.15rem; }
   .votes-table th .sw { display: none; }
 }
-@media (max-width: 360px) {
+@media (max-width: 390px) {
   .votes-table .statewide-body td, .votes-table th { font-size: .7rem; }
   .votes-table td.name { font-size: .72rem; }
   .votes-table input { font-size: .7rem; padding: .15rem .1rem; }
