@@ -52,9 +52,10 @@
   </section>
   <section class="table-section votes-section" aria-labelledby="votes-title">
     <h2 id="votes-title">Votes by county</h2>
-    <p class="votes-note">Change any count to see how the scale responds: the county’s circle grows or shrinks, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
+    <p class="votes-note">Turn on <strong>Edit votes</strong> to change any count and see how the scale responds: the county’s circle grows or shrinks, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
     <div class="table-tools">
-      <button class="reset-votes" type="button" disabled>Reset all</button>
+      <button class="edit-votes" type="button" aria-pressed="false">Edit votes</button>
+      <button class="reset-votes" type="button" disabled hidden>Reset all</button>
       <span class="edit-count" aria-live="polite"></span>
     </div>
     <table class="votes-table">

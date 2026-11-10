@@ -2,7 +2,8 @@ import { fmt, pct } from "./format.js";
 import { COUNTY_BY_ID } from "./counties.js";
 
 // ---------- Scale page: editable votes table ----------
-// One row per county with the Yes and No counts as text inputs. Edits change the shared
+// One row per county with the Yes and No counts as text inputs, read-only until the Edit votes
+// button turns editing on (the choice is kept across measures). Edits change the shared
 // `votes` map in place and call onEdit (debounced while typing); the reported numbers stay
 // in `original` so each row, and the whole table, can be reset.
 
@@ -19,7 +20,8 @@ export function createVoteTable(section, { onEdit, onHover }) {
   const sumBody = section.querySelector(".statewide-body");
   const resetAll = section.querySelector(".reset-votes");
   const editCount = section.querySelector(".edit-count");
-  let original = new Map(), votes = new Map(), timer = null;
+  const editBtn = section.querySelector(".edit-votes");
+  let original = new Map(), votes = new Map(), timer = null, editing = false;
 
   const isEdited = id => SIDES.some(s => votes.get(id)[s] !== original.get(id)[s]);
   const edited = () => [...votes.keys()].filter(isEdited).length;
@@ -37,7 +39,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
       input.classList.toggle("edited", v[input.dataset.side] !== o[input.dataset.side]);
     }
     tr.querySelector(".share").textContent = shareText(v);
-    tr.querySelector(".row-reset").hidden = !isEdited(id);
+    tr.querySelector(".row-reset").hidden = !editing || !isEdited(id);
   }
 
   function syncTotals() {
@@ -55,8 +57,25 @@ export function createVoteTable(section, { onEdit, onHover }) {
     share.className = "num share";
     share.textContent = shareText(t);
     const n = edited();
-    editCount.textContent = n ? `${n} ${n === 1 ? "county" : "counties"} edited` : "Showing reported results";
+    editCount.textContent = n ? `${n} ${n === 1 ? "county" : "counties"} edited`
+      : editing ? "Change any count" : "Showing reported results";
     resetAll.disabled = n === 0;
+    resetAll.hidden = !editing && n === 0; // stays available while edits are in effect
+  }
+
+  // Read-only inputs are skipped by Tab, so the table reads like plain text until editing is on
+  const setInputMode = input => { input.readOnly = !editing; input.tabIndex = editing ? 0 : -1; };
+
+  function setEditing(on) {
+    editing = on;
+    editBtn.setAttribute("aria-pressed", String(on));
+    editBtn.textContent = on ? "Done editing" : "Edit votes";
+    if (!on && countyBody.contains(document.activeElement)) document.activeElement.blur();
+    for (const tr of countyBody.rows) {
+      tr.querySelectorAll("input").forEach(setInputMode);
+      syncRow(tr);
+    }
+    syncTotals();
   }
 
   function setData(orig, current) {
@@ -82,6 +101,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
           type: "text", inputMode: "numeric", autocomplete: "off", value: fmt(votes.get(id)[side])
         });
         input.dataset.side = side;
+        setInputMode(input);
         input.setAttribute("aria-label", `${name} ${side === "yes" ? "Yes" : "No"} votes`);
         const td = tr.insertCell();
         td.className = "num";
@@ -96,7 +116,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
 
   countyBody.addEventListener("input", e => {
     const input = e.target.closest("input");
-    if (!input) return;
+    if (!input || input.readOnly) return;
     const tr = input.closest("tr");
     votes.get(tr.dataset.id)[input.dataset.side] = parse(input.value);
     syncRow(tr);
@@ -106,7 +126,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
   // Tidy the number when leaving the field (and apply at once, without waiting for the delay)
   countyBody.addEventListener("change", e => {
     const input = e.target.closest("input");
-    if (!input) return;
+    if (!input || input.readOnly) return;
     input.value = fmt(votes.get(input.closest("tr").dataset.id)[input.dataset.side]);
     commit({ now: true });
   });
@@ -123,6 +143,10 @@ export function createVoteTable(section, { onEdit, onHover }) {
     syncTotals();
     tr.querySelector("input").focus();
     commit({ now: true });
+  });
+  editBtn.addEventListener("click", () => {
+    setEditing(!editing);
+    if (editing) countyBody.querySelector("input")?.focus({ preventScroll: true });
   });
   resetAll.addEventListener("click", () => {
     for (const [id, o] of original) Object.assign(votes.get(id), o);
