@@ -2,13 +2,15 @@ import { fmt, pct } from "./format.js";
 import { COUNTY_BY_ID } from "./counties.js";
 
 // ---------- Scale page: editable votes table ----------
-// One row per county with the Yes and No counts as text inputs, read-only until the Edit votes
-// button turns editing on (the choice is kept across measures). Edits change the shared
+// One row per county with the Yes and No counts as text inputs and a slider for the county's
+// Yes/No split (which keeps its total), all read-only until the Edit votes button turns editing
+// on (the choice is kept across measures). Edits change the shared
 // `votes` map in place and call onEdit (debounced while typing); the reported numbers stay
 // in `original` so each row, and the whole table, can be reset.
 
 const SIDES = ["yes", "no"];
 const EDIT_DELAY_MS = 300;
+const RATIO_STEPS = 1000; // slider resolution: 0.1 point of share
 
 const parse = s => {
   const digits = String(s).replace(/[^\d]/g, "");
@@ -25,7 +27,21 @@ export function createVoteTable(section, { onEdit, onHover }) {
 
   const isEdited = id => SIDES.some(s => votes.get(id)[s] !== original.get(id)[s]);
   const edited = () => [...votes.keys()].filter(isEdited).length;
+  const shareOf = v => (v.yes + v.no ? v.yes / (v.yes + v.no) : 0.5);
   const shareText = v => (v.yes + v.no ? pct(v.yes / (v.yes + v.no)) : "–");
+  const counts = tr => tr.querySelectorAll("input.count");
+
+  // Split bar (a slider in county rows, a plain bar in the statewide row) plus the share as text
+  function ratioCell(td, v, slider) {
+    td.className = "share";
+    const wrap = document.createElement("div");
+    wrap.className = "ratio-wrap";
+    const bar = slider ?? Object.assign(document.createElement("span"), { className: "ratio-bar" });
+    bar.style.setProperty("--p", `${shareOf(v) * 100}%`);
+    const text = Object.assign(document.createElement("span"), { className: "share-text", textContent: shareText(v) });
+    wrap.append(bar, text);
+    td.append(wrap);
+  }
 
   function commit({ now = false } = {}) {
     clearTimeout(timer);
@@ -35,10 +51,16 @@ export function createVoteTable(section, { onEdit, onHover }) {
 
   function syncRow(tr) {
     const id = tr.dataset.id, v = votes.get(id), o = original.get(id);
-    for (const input of tr.querySelectorAll("input")) {
+    for (const input of counts(tr)) {
       input.classList.toggle("edited", v[input.dataset.side] !== o[input.dataset.side]);
     }
-    tr.querySelector(".share").textContent = shareText(v);
+    const slider = tr.querySelector("input.ratio");
+    if (document.activeElement !== slider) slider.value = Math.round(shareOf(v) * RATIO_STEPS);
+    slider.style.setProperty("--p", `${shareOf(v) * 100}%`);
+    slider.setAttribute("aria-valuetext", v.yes + v.no ? `${shareText(v)} Yes` : "no votes");
+    slider.disabled = !editing || v.yes + v.no === 0; // a county with no votes has no split to move
+    slider.tabIndex = editing ? 0 : -1;
+    tr.querySelector(".share-text").textContent = shareText(v);
     tr.querySelector(".row-reset").hidden = !editing || !isEdited(id);
   }
 
@@ -53,9 +75,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
       td.className = "num";
       td.textContent = fmt(t[side]);
     }
-    const share = tr.insertCell();
-    share.className = "num share";
-    share.textContent = shareText(t);
+    ratioCell(tr.insertCell(), t);
     const n = edited();
     editCount.textContent = n ? `${n} ${n === 1 ? "county" : "counties"} edited`
       : editing ? "Change any count" : "Showing reported results";
@@ -72,7 +92,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
     editBtn.textContent = on ? "Done editing" : "Edit votes";
     if (!on && countyBody.contains(document.activeElement)) document.activeElement.blur();
     for (const tr of countyBody.rows) {
-      tr.querySelectorAll("input").forEach(setInputMode);
+      counts(tr).forEach(setInputMode);
       syncRow(tr);
     }
     syncTotals();
@@ -100,6 +120,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
         const input = Object.assign(document.createElement("input"), {
           type: "text", inputMode: "numeric", autocomplete: "off", value: fmt(votes.get(id)[side])
         });
+        input.className = "count";
         input.dataset.side = side;
         setInputMode(input);
         input.setAttribute("aria-label", `${name} ${side === "yes" ? "Yes" : "No"} votes`);
@@ -107,8 +128,11 @@ export function createVoteTable(section, { onEdit, onHover }) {
         td.className = "num";
         td.append(input);
       }
-      const share = tr.insertCell();
-      share.className = "num share";
+      const slider = Object.assign(document.createElement("input"), {
+        type: "range", className: "ratio", min: 0, max: RATIO_STEPS, step: 1
+      });
+      slider.setAttribute("aria-label", `${name} Yes share of the county's votes`);
+      ratioCell(tr.insertCell(), votes.get(id), slider);
       syncRow(tr);
     }
     syncTotals();
@@ -116,9 +140,17 @@ export function createVoteTable(section, { onEdit, onHover }) {
 
   countyBody.addEventListener("input", e => {
     const input = e.target.closest("input");
-    if (!input || input.readOnly) return;
-    const tr = input.closest("tr");
-    votes.get(tr.dataset.id)[input.dataset.side] = parse(input.value);
+    if (!input || input.readOnly || input.disabled) return;
+    const tr = input.closest("tr"), v = votes.get(tr.dataset.id);
+    if (input.classList.contains("ratio")) {
+      // Move the split, keeping the county's total
+      const total = v.yes + v.no;
+      v.yes = Math.round((total * Number(input.value)) / RATIO_STEPS);
+      v.no = total - v.yes;
+      for (const c of counts(tr)) c.value = fmt(v[c.dataset.side]);
+    } else {
+      v[input.dataset.side] = parse(input.value);
+    }
     syncRow(tr);
     syncTotals();
     commit();
@@ -126,32 +158,33 @@ export function createVoteTable(section, { onEdit, onHover }) {
   // Tidy the number when leaving the field (and apply at once, without waiting for the delay)
   countyBody.addEventListener("change", e => {
     const input = e.target.closest("input");
-    if (!input || input.readOnly) return;
-    input.value = fmt(votes.get(input.closest("tr").dataset.id)[input.dataset.side]);
+    if (!input || input.readOnly || input.disabled) return;
+    if (input.classList.contains("count")) input.value = fmt(votes.get(input.closest("tr").dataset.id)[input.dataset.side]);
+    else syncRow(input.closest("tr")); // let go of the slider: snap it to the exact split
     commit({ now: true });
   });
   countyBody.addEventListener("keydown", e => {
-    if (e.key === "Enter" && e.target.matches("input")) e.target.blur();
+    if (e.key === "Enter" && e.target.matches("input.count")) e.target.blur();
   });
   countyBody.addEventListener("click", e => {
     const btn = e.target.closest(".row-reset");
     if (!btn) return;
     const tr = btn.closest("tr"), id = tr.dataset.id;
     Object.assign(votes.get(id), original.get(id));
-    for (const input of tr.querySelectorAll("input")) input.value = fmt(votes.get(id)[input.dataset.side]);
+    for (const input of counts(tr)) input.value = fmt(votes.get(id)[input.dataset.side]);
     syncRow(tr);
     syncTotals();
-    tr.querySelector("input").focus();
+    tr.querySelector("input.count").focus();
     commit({ now: true });
   });
   editBtn.addEventListener("click", () => {
     setEditing(!editing);
-    if (editing) countyBody.querySelector("input")?.focus({ preventScroll: true });
+    if (editing) countyBody.querySelector("input.count")?.focus({ preventScroll: true });
   });
   resetAll.addEventListener("click", () => {
     for (const [id, o] of original) Object.assign(votes.get(id), o);
     for (const tr of countyBody.rows) {
-      for (const input of tr.querySelectorAll("input")) input.value = fmt(votes.get(tr.dataset.id)[input.dataset.side]);
+      for (const input of counts(tr)) input.value = fmt(votes.get(tr.dataset.id)[input.dataset.side]);
       syncRow(tr);
     }
     syncTotals();
