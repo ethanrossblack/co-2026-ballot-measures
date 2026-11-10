@@ -61,11 +61,11 @@
     <table class="votes-table">
       <thead>
         <tr>
-          <th scope="col">County</th>
-          <th scope="col" class="num"><span class="sw yes"></span> Yes votes</th>
-          <th scope="col" class="num"><span class="sw no"></span> No votes</th>
-          <th scope="col" class="num share-col">Yes share</th>
-          <th scope="col" class="num total-col">Total</th>
+          <th scope="col" aria-sort="ascending"><button type="button" class="sort-btn" data-key="name" data-sort="asc">County<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num" aria-sort="none"><button type="button" class="sort-btn" data-key="yes"><span class="sw yes"></span>Yes votes<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num" aria-sort="none"><button type="button" class="sort-btn" data-key="no"><span class="sw no"></span>No votes<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num share-col" aria-sort="none"><button type="button" class="sort-btn" data-key="share">Yes share<span class="arrow" aria-hidden="true"></span></button></th>
+          <th scope="col" class="num total-col" aria-sort="none"><button type="button" class="sort-btn" data-key="total">Total<span class="arrow" aria-hidden="true"></span></button></th>
         </tr>
       </thead>
       <tbody class="statewide-body"></tbody>

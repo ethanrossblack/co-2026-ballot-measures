@@ -36,7 +36,8 @@
 .scale-stage { position: relative; }
 /* Wide screens: the votes table beside the scale, which stays in view while the table scrolls */
 @media (min-width: 1100px) {
-  .scale-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(30rem, 38rem); align-items: start; }
+  .scale-layout .votes-table input.ratio, .scale-layout .ratio-bar { flex-basis: 4.5rem; width: 4.5rem; }
+  .scale-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(30rem, 40.5rem); align-items: start; }
   .scale-layout .scale-section { position: sticky; top: var(--bar-h, 0px); }
   .scale-layout .votes-section { margin: 0; padding-left: 0; }
 }
@@ -46,7 +47,8 @@
 .edit-count { color: var(--muted); font-size: .9rem; }
 .reset-votes:disabled { opacity: .45; cursor: default; background: none; }
 .votes-table th, .votes-table td { vertical-align: middle; }
-.votes-table th .sw { margin-right: .25rem; }
+.votes-table th .sw { flex: none; }
+.votes-table th .sort-btn { gap: .3rem; }
 .votes-table td.num, .votes-table th.num { text-align: right; }
 /* Yes share: a split bar that is a slider in county rows (live only while editing) */
 .votes-table td.share { width: 10.5rem; }
@@ -60,6 +62,8 @@
 .ratio-wrap .pct-sign { margin-left: -.3rem; color: var(--muted); font-size: .9rem; }
 /* Read-only: no step arrows, so the share reads like plain text */
 .votes-table input.pct[readonly] { -moz-appearance: textfield; appearance: textfield; padding-right: .45rem; }
+/* Editing: room for seven digits plus the step arrows */
+.votes-table input.count[type="number"] { padding-right: .2rem; min-width: 5.6rem; }
 .votes-table input.pct[readonly]::-webkit-inner-spin-button,
 .votes-table input.pct[readonly]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .votes-table input.ratio, .ratio-bar {
@@ -120,7 +124,7 @@
   .pan-label .total { font-size: .85rem; }
 }
 /* Phones: five columns are tight, so the share keeps its percentage field and drops the slider */
-@media (max-width: 480px) {
+@media (max-width: 700px) {
   .votes-section.table-section { padding-left: .5rem; padding-right: .5rem; }
   .votes-table th, .votes-table td { padding-left: .15rem; padding-right: .15rem; }
   .votes-table th { font-size: .8rem; }
@@ -129,15 +133,17 @@
   .votes-table input.ratio, .ratio-bar { display: none; }
   .votes-table td.share { width: auto; }
   /* No step arrows on phones (touch browsers don't show them); the keyboard still steps */
-  .votes-table input.pct { width: 3.3rem; -moz-appearance: textfield; appearance: textfield; padding-right: .2rem; }
+  .votes-table input.pct { width: 3.3rem; padding-right: .2rem; }
+  .votes-table input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  .votes-table input.count[type="number"] { min-width: 0; }
   .votes-table .pct-box { width: 3.3rem; padding: .2rem; }
-  .votes-table input.pct::-webkit-inner-spin-button,
-  .votes-table input.pct::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .votes-table input[type="number"]::-webkit-inner-spin-button,
+  .votes-table input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .ratio-wrap .pct-sign { font-size: .75rem; margin-left: -.15rem; }
   .votes-table th .sw { display: none; }
 }
 @media (max-width: 390px) {
-  .votes-table .statewide-body td, .votes-table th { font-size: .7rem; }
+  .votes-table .statewide-body td, .votes-table th, .votes-table th .sort-btn { font-size: .7rem; }
   .votes-table td.name { font-size: .72rem; }
   .votes-table input { font-size: .7rem; padding: .15rem .1rem; }
   .votes-table input.pct { width: 2.9rem; }

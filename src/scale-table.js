@@ -10,6 +10,9 @@ import { COUNTY_BY_ID } from "./counties.js";
 //   Yes share  (slider or %) moves votes between Yes and No, keeping the total
 // Edits change the shared `votes` map in place and call onEdit (debounced while typing); the
 // reported numbers stay in `original` so each row, and the whole table, can be reset.
+// Header buttons sort the county rows (the statewide row stays on top). Rows are re-sorted only
+// when a header is clicked or the measure changes, never while typing, so a row being edited
+// doesn't jump away.
 
 const SIDES = ["yes", "no"];
 const EDIT_DELAY_MS = 300;
@@ -32,6 +35,8 @@ export function createVoteTable(section, { onEdit, onHover }) {
   const resetAll = section.querySelector(".reset-votes");
   const editCount = section.querySelector(".edit-count");
   const editBtn = section.querySelector(".edit-votes");
+  const sortBtns = [...section.querySelectorAll(".sort-btn")];
+  let sort = { key: "name", dir: "asc" };
   let original = new Map(), votes = new Map(), timer = null, editing = false;
   // Each county's intended Yes share. Editing the total keeps this, so typing a total digit by
   // digit doesn't drift the split through rounding (a total of "1" can only be 100% or 0%).
@@ -49,9 +54,14 @@ export function createVoteTable(section, { onEdit, onHover }) {
     td.classList.toggle("lead-yes", side === "yes" && leader(v) === "yes");
     td.classList.toggle("lead-no", side === "no" && leader(v) === "no");
   };
-  // The share field is a number input (0-100, with step arrows); "%" is printed beside it
-  const fieldText = (v, f) => (f === "share" ? (total(v) ? (shareOf(v) * 100).toFixed(1) : "")
-    : fmt(f === "total" ? total(v) : v[f]));
+  // The share field is a number input (0-100, with step arrows); "%" is printed beside it. Counts
+  // are number inputs while editing (plain digits, which is all a number input can show) and
+  // text with thousands separators while read-only.
+  const fieldText = (v, f) => {
+    if (f === "share") return total(v) ? (shareOf(v) * 100).toFixed(1) : "";
+    const n = f === "total" ? total(v) : v[f];
+    return editing ? String(n) : fmt(n);
+  };
   const differs = (v, o, f) => (f === "share" ? shareText(v) !== shareText(o) : f === "total" ? total(v) !== total(o) : v[f] !== o[f]);
 
   function commit({ now = false } = {}) {
@@ -114,7 +124,12 @@ export function createVoteTable(section, { onEdit, onHover }) {
   }
 
   // Read-only fields are skipped by Tab, so the table reads like plain text until editing is on
-  const setInputMode = input => { input.readOnly = !editing; input.tabIndex = editing ? 0 : -1; };
+  // Count fields switch type with the mode (the caller then rewrites their values via syncRow)
+  const setInputMode = input => {
+    input.readOnly = !editing;
+    input.tabIndex = editing ? 0 : -1;
+    if (input.classList.contains("count")) input.type = editing ? "number" : "text";
+  };
 
   function setEditing(on) {
     editing = on;
@@ -131,12 +146,44 @@ export function createVoteTable(section, { onEdit, onHover }) {
   function makeField(name, field, label) {
     const input = field === "share"
       ? Object.assign(document.createElement("input"), { type: "number", min: 0, max: 100, step: 0.1, placeholder: "–", className: "field pct" })
-      : Object.assign(document.createElement("input"), { type: "text", inputMode: "numeric", className: "field count" });
+      : Object.assign(document.createElement("input"), { type: "text", min: 0, max: 1e9, step: 1, className: "field count" });
     input.autocomplete = "off";
     input.dataset.field = field;
     input.setAttribute("aria-label", `${name} ${label}`);
     setInputMode(input);
     return input;
+  }
+
+  // Sort keys: county name, or a count / share (counties with no votes sort below 0%)
+  const sortValue = (id, key) => {
+    const v = votes.get(id);
+    if (key === "name") return COUNTY_BY_ID.get(id).name;
+    if (key === "share") return total(v) ? shareOf(v) : -1;
+    return key === "total" ? total(v) : v[key];
+  };
+  function applySort() {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const name = id => COUNTY_BY_ID.get(id).name;
+    const rows = [...countyBody.rows].sort((a, b) => {
+      const x = sortValue(a.dataset.id, sort.key), y = sortValue(b.dataset.id, sort.key);
+      const c = sort.key === "name" ? x.localeCompare(y) : x - y;
+      return c * dir || name(a.dataset.id).localeCompare(name(b.dataset.id)); // ties: by name
+    });
+    countyBody.append(...rows);
+    for (const btn of sortBtns) {
+      const on = btn.dataset.key === sort.key;
+      if (on) btn.dataset.sort = sort.dir; else delete btn.dataset.sort;
+      btn.closest("th").setAttribute("aria-sort", on ? (sort.dir === "asc" ? "ascending" : "descending") : "none");
+      btn.title = `Sort by ${btn.textContent.trim()}${on ? ` (${sort.dir === "asc" ? "ascending" : "descending"}; click to reverse)` : ""}`;
+    }
+  }
+  // First click on a column: names A-Z, numbers largest first; clicking again reverses
+  for (const btn of sortBtns) {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      sort = sort.key === key ? { key, dir: sort.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" ? "asc" : "desc" };
+      applySort();
+    });
   }
 
   function setData(orig, current) {
@@ -178,6 +225,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
       tr.insertBefore(td, tr.querySelector("td.total-col")); // columns: Yes, No, Yes share, Total
       syncRow(tr);
     }
+    applySort();
     syncTotals();
   }
 
