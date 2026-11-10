@@ -88,7 +88,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
     tr.insertCell().textContent = "Statewide";
     for (const [field, value] of [["yes", t.yes], ["no", t.no], ["total", total(t)]]) {
       const td = tr.insertCell();
-      td.className = "num";
+      td.className = `num ${field === "total" ? "total-col" : ""}`;
       td.textContent = fmt(value);
       markLead(td, field, t);
     }
@@ -97,8 +97,15 @@ export function createVoteTable(section, { onEdit, onHover }) {
     const wrap = Object.assign(document.createElement("div"), { className: "ratio-wrap" });
     const bar = Object.assign(document.createElement("span"), { className: "ratio-bar" });
     bar.style.setProperty("--p", `${shareOf(t) * 100}%`);
-    wrap.append(bar, Object.assign(document.createElement("span"), { className: "share-text", textContent: shareText(t) }));
+    // Same layout as a county row (bar, a box the size of the % field, "%"), so the column lines up
+    const value = Object.assign(document.createElement("span"), {
+      className: "pct-box", textContent: total(t) ? (shareOf(t) * 100).toFixed(1) : "–"
+    });
+    const sign = Object.assign(document.createElement("span"), { className: "pct-sign", textContent: "%" });
+    sign.setAttribute("aria-hidden", "true");
+    wrap.append(bar, value, sign);
     td.append(wrap);
+    tr.insertBefore(td, tr.querySelector("td.total-col")); // columns: Yes, No, Yes share, Total
     const n = edited();
     editCount.textContent = n ? `${n} ${n === 1 ? "county" : "counties"} edited`
       : editing ? "Change any count or share" : "Showing reported results";
@@ -168,6 +175,7 @@ export function createVoteTable(section, { onEdit, onHover }) {
       sign.setAttribute("aria-hidden", "true");
       wrap.append(slider, makeField(name, "share", "Yes share, percent"), sign);
       td.append(wrap);
+      tr.insertBefore(td, tr.querySelector("td.total-col")); // columns: Yes, No, Yes share, Total
       syncRow(tr);
     }
     syncTotals();
