@@ -1,0 +1,33 @@
+/* Scale page (scale.html); loaded after styles.css */
+:root {
+  --metal: #7b8882;
+  --metal-2: #aab5ae;
+  --chain: #c49a2c;
+  --base: #3b8a78;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --metal: #5f6c66;
+    --metal-2: #84918a;
+    --chain: #b28d2e;
+    --base: #3f8a78;
+  }
+}
+.scale-section { flex: none; padding: .25rem var(--pad) var(--pad); }
+.scale-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin: 0 0 .5rem; }
+#scale-verdict { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Width and stage height are set by scale.js so the whole scale fits the window */
+.scale-frame { margin: 0 auto; max-width: 100%; }
+.pan-labels { display: flex; justify-content: space-between; gap: 1rem; }
+.pan-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .5rem; }
+.pan-label.no { flex-direction: row-reverse; text-align: right; } /* mirror of Yes: swatch on the outside */
+.pan-label h3 { margin: 0; font: 600 1.5rem/1 "Barlow Condensed", "Barlow", sans-serif; }
+.pan-label .swatch { width: .8rem; height: .8rem; border-radius: 2px; align-self: center; }
+.pan-label.yes .swatch { background: var(--yes); }
+.pan-label.no .swatch { background: var(--no); }
+.pan-label .total { color: var(--muted); font-variant-numeric: tabular-nums; }
+.scale-stage { position: relative; }
+@media (max-width: 560px) {
+  .pan-label h3 { font-size: 1.25rem; }
+  .pan-label .total { font-size: .85rem; }
+}
