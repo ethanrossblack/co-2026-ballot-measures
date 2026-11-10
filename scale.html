@@ -52,7 +52,7 @@
   </section>
   <section class="table-section votes-section" aria-labelledby="votes-title">
     <h2 id="votes-title">Votes by county</h2>
-    <p class="votes-note">Turn on <strong>Edit votes</strong> to change any count, or drag a county’s Yes share slider (which keeps its total), and see how the scale responds: the county’s circle grows or shrinks, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
+    <p class="votes-note">Turn on <strong>Edit votes</strong> to change any count and see how the scale responds. Changing a county’s total keeps its Yes share; changing its Yes share (slider or percentage) keeps its total. As you edit, the county’s circles grow or shrink, and the beam and dial follow the new weights. Edits aren’t saved, and picking another measure starts again from the reported results.</p>
     <div class="table-tools">
       <button class="edit-votes" type="button" aria-pressed="false">Edit votes</button>
       <button class="reset-votes" type="button" disabled hidden>Reset all</button>
@@ -64,6 +64,7 @@
           <th scope="col">County</th>
           <th scope="col" class="num"><span class="sw yes"></span> Yes votes</th>
           <th scope="col" class="num"><span class="sw no"></span> No votes</th>
+          <th scope="col" class="num total-col">Total</th>
           <th scope="col" class="num share-col">Yes share</th>
         </tr>
       </thead>
