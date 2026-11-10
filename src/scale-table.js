@@ -43,6 +43,12 @@ export function createVoteTable(section, { onEdit, onHover }) {
   const isEdited = id => SIDES.some(s => votes.get(id)[s] !== original.get(id)[s]);
   const edited = () => [...votes.keys()].filter(isEdited).length;
   const fieldsOf = tr => tr.querySelectorAll("input.field");
+  // The side with more votes: its count cell is filled with its colour and set in bold
+  const leader = v => (v.yes > v.no ? "yes" : v.no > v.yes ? "no" : null);
+  const markLead = (td, side, v) => {
+    td.classList.toggle("lead-yes", side === "yes" && leader(v) === "yes");
+    td.classList.toggle("lead-no", side === "no" && leader(v) === "no");
+  };
   // The share field is a number input (0-100, with step arrows); "%" is printed beside it
   const fieldText = (v, f) => (f === "share" ? (total(v) ? (shareOf(v) * 100).toFixed(1) : "")
     : fmt(f === "total" ? total(v) : v[f]));
@@ -62,6 +68,8 @@ export function createVoteTable(section, { onEdit, onHover }) {
       const f = input.dataset.field;
       if (document.activeElement !== input || input === tidy) input.value = fieldText(v, f);
       input.classList.toggle("edited", differs(v, o, f));
+      input.closest("td").classList.toggle("changed", differs(v, o, f)); // bar under edited cells
+      if (f === "yes" || f === "no") markLead(input.closest("td"), f, v);
     }
     const slider = tr.querySelector("input.ratio");
     if (document.activeElement !== slider || slider === tidy) slider.value = Math.round(shareOf(v) * RATIO_STEPS);
@@ -78,10 +86,11 @@ export function createVoteTable(section, { onEdit, onHover }) {
     sumBody.innerHTML = "";
     const tr = sumBody.insertRow();
     tr.insertCell().textContent = "Statewide";
-    for (const value of [t.yes, t.no, total(t)]) {
+    for (const [field, value] of [["yes", t.yes], ["no", t.no], ["total", total(t)]]) {
       const td = tr.insertCell();
       td.className = "num";
       td.textContent = fmt(value);
+      markLead(td, field, t);
     }
     const td = tr.insertCell();
     td.className = "share";

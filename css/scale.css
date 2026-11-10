@@ -87,8 +87,17 @@
 }
 .votes-table input:not([readonly]):hover { border-color: var(--muted); }
 .votes-table input:focus-visible { outline: 2px solid var(--line); outline-offset: 1px; border-color: var(--line); }
-.votes-table input.edited { font-weight: 600; border-color: var(--line); background: var(--hover-bg); }
-/* Read-only until Edit votes is on: the counts look like plain table text (edited ones stay bold) */
+/* Edited values: a bar along the bottom of the cell, in both modes (bold is taken by the
+   leading side, and browsers don't draw text decorations inside inputs) */
+.votes-table input.edited { border-color: var(--line); }
+.votes-table td.changed { box-shadow: inset 0 -3px 0 var(--line); }
+/* The side with more votes in each row: its cell filled with its colour, the count in bold */
+.votes-table td.lead-yes { background: var(--yes); }
+.votes-table td.lead-no { background: var(--no); }
+.votes-table td.lead-yes, .votes-table td.lead-no,
+.votes-table td.lead-yes input, .votes-table td.lead-no input { color: var(--bar-ink); font-weight: 700; }
+.votes-table td.lead-yes input:not([readonly]), .votes-table td.lead-no input:not([readonly]) { border-color: rgb(0 0 0 / .2); }
+/* Read-only until Edit votes is on: the counts look like plain table text */
 .votes-table input[readonly] { border-color: transparent; background: transparent; cursor: default; }
 .votes-table input[readonly]:focus-visible { outline: none; }
 .edit-votes[aria-pressed="true"] { background: var(--line); color: var(--paper); }
