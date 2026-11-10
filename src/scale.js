@@ -36,7 +36,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 let L = null;           // geometry and balance constants for the current width (see geometry())
 let dpr = 1;
-let results = null, scaleK = 0;
+let results = null, scaleK = 0, measure = null;
 let items = [];         // dropped circles: { body, side, id, name, votes, r, idx, born, landed }
 const byBody = new Map(); // Matter body id -> item
 let walls = [];
@@ -51,10 +51,14 @@ let pointer = null;     // pointer position in CSS px while over the canvas
 
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ["ink", "paper", "line", "active", "yes", "yes-2", "no", "no-2", "metal", "metal-2", "chain", "base"]) {
+  for (const k of ["ink", "paper", "line", "active", "yes", "yes-2", "no", "no-2", "metal", "metal-2", "chain", "base", "muted", "face"]) {
     colors[k] = cs.getPropertyValue(`--${k}`).trim();
   }
 }
+
+// Load difference (mL - mR) as a share of a full pan, at rest, for a vote gap d = yes share - no share.
+// The heavier pan always holds a full pan's load (scaleK is set that way), so this is exact.
+const loadGap = d => (2 * Math.abs(d)) / (1 + Math.abs(d));
 
 // Everything is proportional to the drawing width w. Pan-local frame: origin at the
 // centre of the pan's rim, y down; the bowl is the lower half of an a x b ellipse.
@@ -67,7 +71,10 @@ function geometry(w) {
     wallH: 0.6 * a,          // invisible walls above the rim that keep a heap from spilling
     beamW: Math.max(5, 0.015 * w), ringR: Math.max(4, 0.011 * w)
   };
-  g.pivotY = lift + 0.06 * w;
+  g.dialR = 0.11 * w;                         // the measuring dial above the pivot
+  g.pivotY = Math.max(lift + 0.06 * w, 0.205 * w); // room above the beam for the dial
+  g.hubY = g.pivotY - 0.065 * w;              // the needle's pivot
+  g.dialGain = S.dialSweepDeg / S.maxTiltDeg;
   g.baseTop = g.pivotY + lift + g.chainH + g.b + g.th + 0.03 * w; // clear of the lowest pan
   g.baseH = 0.035 * w;
   g.h = Math.ceil(g.baseTop + g.baseH + 4);
@@ -80,8 +87,7 @@ function geometry(w) {
   g.inertia = S.beamInertia * g.full * R * R;
   // Beam mass x its centre-of-mass depth below the pivot. At rest tan(tilt) = (mL - mR) R / mh,
   // so this sets the sensitivity: a final gap of fullTiltGap of all votes reaches the stops.
-  const d = S.fullTiltGap, dmFull = (g.full * 2 * d) / (1 + d);
-  g.mh = (dmFull * R) / Math.tan(maxTilt);
+  g.mh = (loadGap(S.fullTiltGap) * g.full * R) / Math.tan(maxTilt);
   return g;
 }
 const ASPECT = geometry(1000).h / 1000;
@@ -234,9 +240,11 @@ function land(b, other) {
   for (let k = 0; k < 2; k++) inertia += panTotal(k) * L.R * L.R;
   beam.v += torqueAt(i, { x: J.y * sp, y: J.y * cp }) / inertia;
 }
-Events.on(engine, "collisionStart", e => {
-  for (const { bodyA, bodyB } of e.pairs) { land(bodyA, bodyB); land(bodyB, bodyA); }
-});
+// Ongoing contacts count too: a circle that came to rest on another before that one landed
+// only starts weighing once its support has landed
+const landPairs = e => { for (const { bodyA, bodyB } of e.pairs) { land(bodyA, bodyB); land(bodyB, bodyA); } };
+Events.on(engine, "collisionStart", landPairs);
+Events.on(engine, "collisionActive", landPairs);
 
 Events.on(engine, "afterUpdate", () => {
   for (const it of items) {
@@ -294,6 +302,113 @@ function pick(H) {
     if (d <= Math.max(it.r, 4) && d < bestD) { best = it; bestD = d; }
   }
   return best;
+}
+
+// The dial is graduated from the balance law: the resting beam angle for a Yes share p,
+// and the Yes share that a resting beam at angle a stands for
+function restAngle(p) {
+  const d = 2 * p - 1;
+  return Math.sign(d) * Math.atan((Math.tan(L.maxTilt) * loadGap(d)) / loadGap(S.fullTiltGap));
+}
+function readShare(a) {
+  const x = Math.min(1, Math.tan(Math.abs(a)) / Math.tan(L.maxTilt)) * loadGap(S.fullTiltGap);
+  return (1 + (Math.sign(a) * x) / (2 - x)) / 2;
+}
+
+// Measuring dial at the top centre: a needle geared to the beam over a scale graduated in vote
+// shares (left half = Yes ahead, right half = No ahead), with the reading on either side
+function drawGauge(passShare) {
+  const { cx, hubY, pivotY, dialR: r, w, beamW, maxTilt, dialGain } = L;
+  const sweep = dialGain * maxTilt;
+  // phi = needle angle from upright, + toward the Yes side (left)
+  const at = (phi, rr) => [cx - rr * Math.sin(phi), hubY - rr * Math.cos(phi)];
+  const line = (phi, r0, r1) => { const [x0, y0] = at(phi, r0), [x1, y1] = at(phi, r1); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); };
+
+  ctx.fillStyle = colors["metal-2"];
+  ctx.fillRect(cx - beamW * 0.5, hubY, beamW, pivotY - hubY); // stem down to the pivot housing
+  ctx.fillStyle = colors.face;
+  ctx.strokeStyle = colors.metal;
+  ctx.lineWidth = Math.max(2, 0.004 * w);
+  ctx.beginPath();
+  ctx.arc(cx, hubY, r, Math.PI, 2 * Math.PI);
+  ctx.lineTo(cx + r, hubY + 0.15 * r);
+  ctx.lineTo(cx - r, hubY + 0.15 * r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Coloured band: Yes ahead on the left, No ahead on the right
+  ctx.lineWidth = 0.08 * r;
+  for (const [side, a0, a1] of [["yes", -Math.PI / 2 - sweep, -Math.PI / 2], ["no", -Math.PI / 2, -Math.PI / 2 + sweep]]) {
+    ctx.strokeStyle = colors[side];
+    ctx.beginPath();
+    ctx.arc(cx, hubY, 0.88 * r, a0, a1);
+    ctx.stroke();
+  }
+  // Ticks every point of share, labelled every 5 (every 10 on a small dial) with the leading side's share
+  const lo = Math.ceil(50 * (1 - S.fullTiltGap)), hi = 100 - lo;
+  const labelEvery = r >= 60 ? 5 : 10;
+  ctx.strokeStyle = colors.ink;
+  ctx.fillStyle = colors.ink;
+  ctx.font = `600 ${r >= 60 ? 11 : 9}px "Barlow", system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let q = lo; q <= hi; q++) {
+    const phi = dialGain * restAngle(q / 100), major = q % 5 === 0;
+    ctx.lineWidth = major ? 1.5 : 1;
+    ctx.beginPath();
+    line(phi, major ? 0.72 * r : 0.79 * r, 0.92 * r);
+    ctx.stroke();
+    if (q % labelEvery === 0) {
+      const [x, y] = at(phi, 0.6 * r);
+      ctx.fillText(String(Math.max(q, 100 - q)), x, y);
+    }
+  }
+  // Notch at the share a measure needs to pass, when that is more than a majority
+  if (passShare > 0.5 && passShare * 100 <= hi) {
+    const phi = dialGain * restAngle(passShare), s = Math.max(4, 0.06 * r);
+    const [x0, y0] = at(phi, 0.93 * r), [x1, y1] = at(phi - s / r, 1.04 * r), [x2, y2] = at(phi + s / r, 1.04 * r);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Needle (the beam's angle times the gear ratio) and hub
+  const phi = dialGain * beam.a;
+  ctx.strokeStyle = colors.ink;
+  ctx.lineWidth = Math.max(2, 0.004 * w);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  line(phi, -0.08 * r, 0.9 * r);
+  ctx.stroke();
+  ctx.fillStyle = colors.metal;
+  ctx.beginPath();
+  ctx.arc(cx, hubY, Math.max(3, 0.07 * r), 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Reading on either side of the dial; at a stop the share is at least the end of the scale
+  const p = readShare(beam.a), pinned = Math.abs(beam.a) >= maxTilt - 1e-6;
+  const big = w >= 600 ? 16 : 13, small = w >= 600 ? 12 : 10, gap = 0.025 * w;
+  const y = hubY - 0.62 * r;
+  SIDES.forEach((side, i) => {
+    const share = i === 0 ? p : 1 - p;
+    const value = `${pinned && share > 0.5 ? "≥ " : ""}${pct(share)}`;
+    const x = i === 0 ? cx - r - gap : cx + r + gap;
+    ctx.textAlign = i === 0 ? "right" : "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.font = `600 ${big}px "Barlow", system-ui, sans-serif`;
+    ctx.fillStyle = colors.ink;
+    ctx.fillText(value, x, y + big);
+    ctx.font = `600 ${small}px "Barlow", system-ui, sans-serif`;
+    ctx.fillStyle = colors.muted;
+    const word = side === "yes" ? "Yes" : "No", ww = ctx.measureText(word).width;
+    ctx.fillText(word, x, y);
+    // Swatch on the outer side of the word
+    ctx.fillStyle = colors[side];
+    const sw = small * 0.75;
+    ctx.fillRect(i === 0 ? x - ww - sw - 4 : x + ww + 4, y - sw, sw, sw);
+  });
 }
 
 function drawStand() {
@@ -391,6 +506,7 @@ function draw(now) {
   ctx.clearRect(0, 0, L.w, L.h);
   const H = hooks();
   drawStand();
+  drawGauge(measure?.passShare);
   drawBeam(H);
 
   const hovered = pick(H);
@@ -488,6 +604,7 @@ function showMeasure(key, { updateUrl = true } = {}) {
   measureSelect.value = m.key;
   document.getElementById("snapshot-note").textContent =
     `${data.election}. ${m.precinctsReportingPercent}% of precincts reporting as of ${data.snapshot}.`;
+  measure = m;
   results = measureToResults(m);
   msg(results.missing.length ? `Counties with no data: ${results.missing.join(", ")}.` : "");
   showMeasureInfo(m, results);

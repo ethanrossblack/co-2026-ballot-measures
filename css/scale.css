@@ -4,6 +4,7 @@
   --metal-2: #aab5ae;
   --chain: #c49a2c;
   --base: #3b8a78;
+  --face: #fbfcf8;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -11,6 +12,7 @@
     --metal-2: #84918a;
     --chain: #b28d2e;
     --base: #3f8a78;
+    --face: #222b26;
   }
 }
 .scale-section { flex: none; padding: .25rem var(--pad) var(--pad); }
